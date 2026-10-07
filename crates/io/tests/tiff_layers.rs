@@ -173,9 +173,14 @@ fn big_documents_use_the_psb_signature() {
 
 /// Files written by psdtags (`scripts/layered_tiff_fixtures.py`): two RGB layers, "Background"
 /// (RLE) and an offset, translucent "Upper é" (ZIP, Multiply, opacity 200), in both byte orders
-/// at 8 and 16 bits.
-fn fixture(name: &str) -> Vec<u8> {
-    std::fs::read(format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"))).expect(name)
+/// at 8 and 16 bits. Binary files stay out of this repository: run the script to write them
+/// to `corpus/layered-tiff/` (gitignored); without them these checks are skipped.
+fn fixture(name: &str) -> Option<Vec<u8>> {
+    let bytes = std::fs::read(format!("{}/../../corpus/layered-tiff/{name}", env!("CARGO_MANIFEST_DIR"))).ok();
+    if bytes.is_none() {
+        eprintln!("skipped {name}: run `python scripts/layered_tiff_fixtures.py` to write corpus/layered-tiff/");
+    }
+    bytes
 }
 
 #[test]
@@ -186,7 +191,7 @@ fn psdtags_fixtures_open_with_their_layers() {
         ("layered-le-16bit.tif", SampleType::U16),
         ("layered-be-16bit.tif", SampleType::U16),
     ] {
-        let bytes = fixture(name);
+        let Some(bytes) = fixture(name) else { continue };
         let r = import(name, &bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
         let d = &r.document;
         assert_eq!(d.size, photocraft_geom::Size::new(6, 4), "{name}");
@@ -248,7 +253,7 @@ fn damaged_layer_data_opens_flattened() {
         let _ = import("x.tif", &b);
     }
     for name in ["layered-le-8bit.tif", "layered-be-16bit.tif"] {
-        let bytes = fixture(name);
+        let Some(bytes) = fixture(name) else { continue };
         for cut in (0..bytes.len()).step_by(7) {
             let _ = import(name, &bytes[..cut]);
         }

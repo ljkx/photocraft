@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generates the layered-TIFF fixtures under crates/io/tests/fixtures with an independent
+"""Generates the layered-TIFF fixtures under corpus/layered-tiff (gitignored) with an independent
 implementation (psdtags + tifffile, BSD-3), so PhotoCraft's reader is checked against a second
 writer rather than only against itself:
 
@@ -33,7 +33,7 @@ from psdtags import (
     TiffImageSourceData,
 )
 
-OUT = Path(__file__).resolve().parent.parent / "crates" / "io" / "tests" / "fixtures"
+OUT = Path(__file__).resolve().parent.parent / "corpus" / "layered-tiff"
 W, H = 6, 4
 
 

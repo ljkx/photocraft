@@ -11,7 +11,7 @@
 //!   block is a global additional-layer-information block (`Patt`, `Anno`, `FMsk`, `Txt2`, …).
 //! * **34377**: the PSD image resources (`8BIM` resource blocks, without the section length).
 //!
-//! **Byte order.** Adobe's note is silent, but Photoshop files show (and Krita and psdtags
+//! **Byte order.** Adobe's note is silent, but Photoshop files show (and open-source readers such as psdtags
 //! implement) that the block structure follows the TIFF's byte order: in an Intel-order (`II`)
 //! file every integer and double is little-endian and every four-character signature and key is
 //! stored reversed (`MIB8`, `ryaL`), while the pixel samples inside channel data stay big-endian
