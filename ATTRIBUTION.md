@@ -63,9 +63,17 @@ Artwork shown in the screenshots (all public domain, via Wikimedia Commons; deta
 | `photocraft-type.jpg` | *Among the Sierra Nevada, California*, Albert Bierstadt, 1868 | [Commons](https://commons.wikimedia.org/wiki/File:Albert_Bierstadt_-_Among_the_Sierra_Nevada,_California_-_Google_Art_Project.jpg) |
 | `photocraft-export-light.jpg` | *The Kiss*, Gustav Klimt, 1907–1908 | [Commons](https://commons.wikimedia.org/wiki/File:Gustav_Klimt_016.jpg) |
 
-## Test data (not committed, not shipped)
+## Test data
 
-`corpus/` is gitignored and no test fixtures are committed to the repository.
+The four layered TIFFs under `crates/io/tests/fixtures/` are the only committed fixtures: each
+is under 1 KB and was written by an independent implementation, so the layered-TIFF reader is
+checked against a second writer. They are MIT OR Apache-2.0 like the rest of the repository.
+
+| Path | Title | Author | Source | License |
+|---|---|---|---|---|
+| `crates/io/tests/fixtures/layered-{le,be}-{8,16}bit.tif` | Synthetic 6 × 4 RGB layered TIFFs: a Background layer (RLE channels) and an offset, translucent "Upper é" layer (ZIP channels, Multiply, opacity 200), Intel- and Motorola-order, 8- and 16-bit, 300 dpi | PhotoCraft contributors; written with [psdtags](https://github.com/cgohlke/psdtags) 2026.1.29 and [tifffile](https://github.com/cgohlke/tifffile) 2026.9.20 (both BSD-3-Clause, not bundled; the deterministic pixel ramps are described in `crates/io/tests/fixtures/README.md`) | this repository | MIT OR Apache-2.0 |
+
+Everything else is fetched: `corpus/` is gitignored.
 `cargo xtask corpus --all` fetches every corpus at the pinned commits in `xtask/src/corpus_pins.rs`
 and verifies each file against the sha256 lists in `xtask/*.sha256`, with the upstream licence
 next to the files:
