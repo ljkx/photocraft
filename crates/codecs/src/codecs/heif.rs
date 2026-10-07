@@ -30,6 +30,15 @@ fn err(e: heic_rs::Error) -> CodecError {
 }
 
 pub(crate) fn decode(bytes: &[u8], limits: &Limits, keep_orientation: bool) -> Result<Image, CodecError> {
+    // heic-rs is young, and a bug in it must be an error, not a crash. Fuzzing found two
+    // out-of-range slices in 0.1.1 on malformed files: in its box parser (`boxes.rs:130`) and
+    // during reconstruction (`hevc/decode/recon.rs:70`). The fuzz target also calls heic-rs
+    // directly, so its panics stay visible there.
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| decode_unguarded(bytes, limits, keep_orientation)))
+        .unwrap_or_else(|_| Err(CodecError::malformed(F, "the HEIF decoder failed on this file")))
+}
+
+fn decode_unguarded(bytes: &[u8], limits: &Limits, keep_orientation: bool) -> Result<Image, CodecError> {
     // The container alone: the declared size is checked before any pixel is decoded.
     let info = heic_rs::probe(bytes).map_err(|e| match e {
         // No `meta` box: no still image, only a `moov` image sequence (a video track).
