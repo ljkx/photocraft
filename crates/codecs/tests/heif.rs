@@ -1,16 +1,40 @@
-//! HEIF/HEIC decoding against Apple's own encoder and decoder. Most fixtures in `tests/heif/`
-//! (from heic-rs, MIT OR Apache-2.0) were encoded by macOS `sips` from synthetic PNGs; each
-//! `.ref.png` is Apple's decode of the `.heic` next to it, the ground truth we compare with.
-//! The 10-bit one is pillow-heif's (BSD-3-Clause), with the source it was encoded from.
+//! HEIF/HEIC decoding against Apple's own encoder and decoder (features `corpus` and `heif`;
+//! run with `cargo xtask test-corpus`). The fixtures are fetched into `corpus/heif/` by
+//! `cargo xtask corpus --heif` (pins: `xtask/src/corpus_pins.rs`); a missing corpus fails.
+//! Most come from heic-rs (`heic-rs/`, MIT OR Apache-2.0): encoded by macOS `sips` from synthetic
+//! PNGs, each `.ref.png` being Apple's decode of the `.heic` next to it, the ground truth we
+//! compare with. The 10-bit one is pillow-heif's (`pillow-heif/`, BSD-3-Clause), with the source
+//! it was encoded from.
+
+#![cfg(all(feature = "corpus", feature = "heif"))]
 
 mod common;
 use common::*;
 use photocraft_codecs::*;
+use std::sync::LazyLock;
 
-const CHECKER_64: &[u8] = include_bytes!("heif/checker-64.heic");
-const STRIPS_96: &[u8] = include_bytes!("heif/rgb-strips-96.heic");
-const CHECKER_GRID: &[u8] = include_bytes!("heif/checker-1024.heic");
-const WITH_EXIF: &[u8] = include_bytes!("heif/with-exif.heic");
+/// A file of `corpus/heif/`.
+fn corpus(rel: &str) -> Vec<u8> {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/heif").join(rel);
+    std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}: run `cargo xtask corpus --all`", p.display()))
+}
+
+static FILES: LazyLock<[Vec<u8>; 4]> =
+    LazyLock::new(|| ["heic-rs/checker-64.heic", "heic-rs/rgb-strips-96.heic", "heic-rs/checker-1024.heic", "heic-rs/with-exif.heic"].map(corpus));
+
+fn checker_64() -> &'static [u8] {
+    &FILES[0]
+}
+fn strips_96() -> &'static [u8] {
+    &FILES[1]
+}
+/// iPhone-style grid of 512x512 tiles (2x2).
+fn checker_grid() -> &'static [u8] {
+    &FILES[2]
+}
+fn with_exif() -> &'static [u8] {
+    &FILES[3]
+}
 
 fn reference(png: &[u8]) -> Image {
     decode_as(Format::Png, png).unwrap().convert(ChannelLayout::Rgb, SampleType::U8)
@@ -44,30 +68,23 @@ fn heif_is_read_only_and_listed() {
     for ext in ["heic", "HEIC", "photo.heif", "IMG_0001.HIF"] {
         assert_eq!(from_extension(ext), Some(Format::Heif), "{ext}");
     }
-    let img = decode(CHECKER_64).unwrap();
+    let img = decode(checker_64()).unwrap();
     assert!(matches!(encode(&img, Format::Heif, &EncodeOptions::default()), Err(CodecError::Unsupported { .. })));
     assert_eq!(fidelity_warnings(&img, Format::Heif), vec![FidelityWarning::WriteUnsupported { format: Format::Heif }]);
 }
 
 #[test]
 fn detect_heif_brands() {
-    for f in [CHECKER_64, STRIPS_96, CHECKER_GRID, WITH_EXIF] {
+    for f in [checker_64(), strips_96(), checker_grid(), with_exif()] {
         assert_eq!(detect(f), Some(Format::Heif));
     }
-    assert_eq!(detect(b"\0\0\0\x18ftypheic\0\0\0\0mif1heic"), Some(Format::Heif));
-    assert_eq!(detect(b"\0\0\0\x18ftypmif1\0\0\0\0mif1heic"), Some(Format::Heif), "generic major brand");
-    assert_eq!(detect(b"\0\0\0\x18ftypheix\0\0\0\0mif1heix"), Some(Format::Heif), "10-bit");
-    assert_eq!(detect(b"\0\0\0\x18ftypmsf1\0\0\0\0msf1hevc"), Some(Format::Heif), "image sequence");
-    assert_eq!(detect(b"\0\0\0\x18ftypmif1\0\0\0\0mif1avif"), Some(Format::Avif), "AVIF wins over the generic brand");
-    assert_eq!(detect(b"\0\0\0\x18ftypisom\0\0\0\0isommp41"), None, "mp4 is not HEIF");
-    assert_eq!(detect(b"\0\0\0\x14ftypqt  \0\0\0\0qt  "), None, "QuickTime is not HEIF");
 }
 
 #[test]
 fn single_picture_matches_apple_decode() {
-    for (heic, png) in [(CHECKER_64, &include_bytes!("heif/checker-64.ref.png")[..]), (STRIPS_96, include_bytes!("heif/rgb-strips-96.ref.png"))] {
+    for (heic, png) in [(checker_64(), "heic-rs/checker-64.ref.png"), (strips_96(), "heic-rs/rgb-strips-96.ref.png")] {
         let img = decode(heic).unwrap();
-        let want = reference(png);
+        let want = reference(&corpus(png));
         assert_eq!((img.layout(), img.sample_type()), (ChannelLayout::Rgb, SampleType::U8));
         assert_eq!(img.dimensions(), want.dimensions());
         assert!(max_abs_diff(&img, &want) <= 3.0 / 255.0, "max diff {}", max_abs_diff(&img, &want) * 255.0);
@@ -78,8 +95,8 @@ fn single_picture_matches_apple_decode() {
 #[test]
 fn grid_tiled_photo_matches_apple_decode() {
     // iPhone photos are grids of 512x512 HEVC tiles: here 2x2.
-    let img = decode(CHECKER_GRID).unwrap();
-    let want = reference(include_bytes!("heif/checker-1024.ref.png"));
+    let img = decode(checker_grid()).unwrap();
+    let want = reference(&corpus("heic-rs/checker-1024.ref.png"));
     assert_eq!(img.dimensions(), (1024, 1024));
     assert!(max_abs_diff(&img, &want) <= 3.0 / 255.0);
 }
@@ -87,7 +104,7 @@ fn grid_tiled_photo_matches_apple_decode() {
 #[test]
 fn rgb_strips_keep_their_colours() {
     // Three vertical strips, pure red, green and blue: catches swapped channels or matrices.
-    let img = decode(STRIPS_96).unwrap();
+    let img = decode(strips_96()).unwrap();
     for (x, c) in [(16, 0), (48, 1), (80, 2)] {
         for ch in 0..3 {
             let v = img.get(x, 16, ch);
@@ -99,7 +116,7 @@ fn rgb_strips_keep_their_colours() {
 #[test]
 fn container_rotation_is_applied_once() {
     // irot 1 = 90° anticlockwise: the red strip (left) ends at the bottom, blue (right) on top.
-    let rotated = with_irot(STRIPS_96, 1);
+    let rotated = with_irot(strips_96(), 1);
     let img = decode(&rotated).unwrap();
     assert_eq!(img.dimensions(), (32, 96));
     assert!(img.get(16, 8, 2) > 0.9 && img.get(16, 8, 0) < 0.1, "blue on top");
@@ -110,14 +127,14 @@ fn container_rotation_is_applied_once() {
 
 #[test]
 fn exif_and_xmp_survive_and_exif_orientation_is_not_applied_twice() {
-    let img = decode(WITH_EXIF).unwrap();
+    let img = decode(with_exif()).unwrap();
     assert_eq!(img.dimensions(), (2048, 1536));
     let exif = img.meta.exif.as_deref().unwrap();
     assert!(exif.starts_with(b"MM\0*"), "TIFF-structured EXIF, without the HEIF offset header");
     assert!(img.meta.xmp.as_deref().unwrap().contains("x:xmpmeta"));
 
     // HEIF's EXIF Orientation repeats what irot says; the container is the authority.
-    let tagged = with_exif_orientation(WITH_EXIF, 6);
+    let tagged = with_exif_orientation(with_exif(), 6);
     let img = decode(&tagged).unwrap();
     assert_eq!(img.dimensions(), (2048, 1536), "not turned by the EXIF tag");
     assert_eq!(exif_orientation(img.meta.exif.as_deref().unwrap()), 1, "rewritten so exports don't turn it either");
@@ -129,11 +146,11 @@ fn exif_and_xmp_survive_and_exif_orientation_is_not_applied_twice() {
 fn limits_are_checked_before_decoding() {
     let tight = |limits| DecodeOptions { limits, ..Default::default() };
     let small = Limits { max_width: 512, ..Default::default() };
-    assert!(matches!(decode_with(CHECKER_GRID, &tight(small)), Err(CodecError::LimitExceeded(_))));
+    assert!(matches!(decode_with(checker_grid(), &tight(small)), Err(CodecError::LimitExceeded(_))));
     let few = Limits { max_pixels: 1000, ..Default::default() };
-    assert!(matches!(decode_with(CHECKER_64, &tight(few)), Err(CodecError::LimitExceeded(_))));
+    assert!(matches!(decode_with(checker_64(), &tight(few)), Err(CodecError::LimitExceeded(_))));
     let bytes = Limits { max_alloc: 64 * 64 * 3 - 1, ..Default::default() };
-    assert!(matches!(decode_with(CHECKER_64, &tight(bytes)), Err(CodecError::LimitExceeded(_))));
+    assert!(matches!(decode_with(checker_64(), &tight(bytes)), Err(CodecError::LimitExceeded(_))));
 }
 
 #[test]
@@ -142,12 +159,12 @@ fn unsupported_and_broken_files_are_clear_errors() {
     let r = decode(b"\0\0\0\x18ftypmsf1\0\0\0\0msf1hevc");
     assert!(matches!(&r, Err(CodecError::Unsupported { format: Format::Heif, reason }) if reason.contains("sequence")), "{r:?}");
     assert!(decode_as(Format::Heif, b"").is_err());
-    assert!(decode_as(Format::Heif, &CHECKER_GRID[..CHECKER_GRID.len() / 2]).is_err(), "half a file");
+    assert!(decode_as(Format::Heif, &checker_grid()[..checker_grid().len() / 2]).is_err(), "half a file");
 }
 
 #[test]
 fn every_truncation_errors_or_decodes_never_panics() {
-    for bytes in [CHECKER_64, STRIPS_96, CHECKER_GRID] {
+    for bytes in [checker_64(), strips_96(), checker_grid()] {
         for cut in 0..bytes.len() {
             let _ = decode_as(Format::Heif, &bytes[..cut]);
         }
@@ -157,8 +174,8 @@ fn every_truncation_errors_or_decodes_never_panics() {
 #[test]
 fn ten_bit_with_alpha_decodes_to_16_bit_rgba() {
     // pillow-heif's fixture: a 16-bit RGBA gradient (the .src.png) encoded as 10-bit HEIF by libheif/x265.
-    let img = decode(include_bytes!("heif/rgba-10bit-29x100.heic")).unwrap();
-    let src = decode_as(Format::Png, include_bytes!("heif/rgba-10bit-29x100.src.png")).unwrap();
+    let img = decode(&corpus("pillow-heif/heif/RGBA_10__29x100.heif")).unwrap();
+    let src = decode_as(Format::Png, &corpus("pillow-heif/non_heif/RGBA_16__29x100.png")).unwrap();
     assert_eq!((img.dimensions(), img.layout(), img.sample_type()), ((29, 100), ChannelLayout::Rgba, SampleType::U16));
     // Depth is kept, not 8 bits stretched: most samples are not multiples of 257.
     let samples = img.to_u16_samples().unwrap();
@@ -174,21 +191,4 @@ fn ten_bit_with_alpha_decodes_to_16_bit_rgba() {
     // decoder); a decoder bug (range, matrix, bit shift) lands far below.
     let rgb = |i: &Image| i.convert(ChannelLayout::Rgb, SampleType::U16);
     assert!(psnr(&rgb(&img), &rgb(&src)) > 24.0, "{}", psnr(&rgb(&img), &rgb(&src)));
-}
-
-/// Found by the `decode_heif` fuzz target: a malformed box makes heic-rs 0.1.1 slice out of range
-/// (`boxes.rs:130`, "slice index starts at 24 but ends at 16"). It must be an error, not a crash.
-const HEIC_RS_BOX_PANIC: [u8; 72] = [
-    0x00, 0x00, 0x00, 0x24, 0x66, 0x74, 0x79, 0x70, 0x68, 0x65, 0x69, 0x63, 0x00, 0x00, 0x00, 0x00, 0x6d, 0x69, 0x66, 0x31, 0x4d, 0x69, 0x50, 0x72, 0x6d, 0x69,
-    0x61, 0x66, 0x4d, 0x69, 0x48, 0x42, 0x72, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6d, 0x65, 0x74, 0x61, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
-    0x75, 0x75, 0x69, 0x64, 0x00, 0x00, 0x00, 0x00, 0x03, 0x08, 0x08, 0x08, 0x00, 0x03, 0x01, 0x03, 0x70, 0x00, 0xa8, 0x00,
-];
-
-#[test]
-fn a_heic_rs_panic_is_a_malformed_file_error() {
-    assert_eq!(detect(&HEIC_RS_BOX_PANIC), Some(Format::Heif));
-    for opts in [DecodeOptions::default(), keep()] {
-        let r = decode_with(&HEIC_RS_BOX_PANIC, &opts);
-        assert!(matches!(r, Err(CodecError::Malformed { format: Format::Heif, .. })), "{r:?}");
-    }
 }

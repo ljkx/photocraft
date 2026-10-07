@@ -3509,10 +3509,10 @@ dependencies = [
  "exr",
  "flate2",
  "half",
- "heic-rs",
  "image",
  "image-webp",
  "jpeg-encoder",
+ "photocraft-heif",
  "png 0.18.1",
  "proptest",
  "rayon",
@@ -3626,6 +3626,13 @@ dependencies = [
  "pollster 1.0.1",
  "rayon",
  "wgpu",
+]
+
+[[package]]
+name = "photocraft-heif"
+version = "0.3.0"
+dependencies = [
+ "heic-rs",
 ]
 
 [[package]]

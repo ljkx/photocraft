@@ -61,8 +61,10 @@ pub const ASYMMETRIC_EXCEPTIONS: &[(Format, &str)] = &[
     ),
     (
         Format::Heif,
-        "HEIC decode uses heic-rs (pure Rust), so iPhone and Mac photos open; writing needs an HEVC \
-         encoder, and the mature ones (x265, libheif) are C, so write stays unsupported.",
+        "HEIC decode uses heic-rs (pure Rust, in the optional photocraft-heif crate behind the \
+         non-default `heif` feature, which official builds enable), so iPhone and Mac photos open; \
+         writing needs an HEVC encoder, and the mature ones (x265, libheif) are C, so write stays \
+         unsupported. Without the feature HEIF is detected but neither read nor written.",
     ),
 ];
 
@@ -203,7 +205,9 @@ pub fn caps(format: Format) -> FormatCaps {
         Format::OpenExr => FormatCaps { depths: &[S::F16, S::F32], layouts: RGB_GRAY, ..base },
         Format::Hdr => FormatCaps { depths: &[S::F32], layouts: &[L::Rgb], alpha: false, lossy: true, ..base },
         Format::Avif => FormatCaps { read: false, write: cfg!(feature = "avif"), lossy: true, ..base },
-        Format::Heif => FormatCaps { write: false, depths: &[S::U8, S::U16], icc: true, exif: true, xmp: true, lossy: true, ..base },
+        Format::Heif => {
+            FormatCaps { read: cfg!(feature = "heif"), write: false, depths: &[S::U8, S::U16], icc: true, exif: true, xmp: true, lossy: true, ..base }
+        }
     }
 }
 

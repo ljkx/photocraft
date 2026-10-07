@@ -20,9 +20,14 @@ fn samples() -> Vec<(Format, Vec<u8>)> {
             v.push((f, encode(&img, f, &EncodeOptions::default()).unwrap()));
         }
     }
-    // Read-only formats: Apple-encoded HEIC, a single picture and a grid of tiles.
-    v.push((Format::Heif, include_bytes!("heif/rgb-strips-96.heic").to_vec()));
-    v.push((Format::Heif, include_bytes!("heif/checker-1024.heic").to_vec()));
+    // Read-only formats: Apple-encoded HEIC from `corpus/heif` (`cargo xtask corpus --heif`), a
+    // single picture and a grid of tiles.
+    #[cfg(all(feature = "corpus", feature = "heif"))]
+    for name in ["rgb-strips-96.heic", "checker-1024.heic"] {
+        let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/heif/heic-rs").join(name);
+        let bytes = std::fs::read(&p).unwrap_or_else(|e| panic!("{}: {e}: run `cargo xtask corpus --all`", p.display()));
+        v.push((Format::Heif, bytes));
+    }
     // Extra variants: interlaced PNG, ASCII PNM, CMYK JPEG.
     let img = synth(19, 13, ChannelLayout::Rgb, SampleType::U8, 1, 0.3);
     v.push((Format::Png, encode(&img, Format::Png, &EncodeOptions { png_interlaced: true, ..Default::default() }).unwrap()));

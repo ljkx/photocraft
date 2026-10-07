@@ -45,7 +45,7 @@ let out = encode(&img, Format::Tiff, &EncodeOptions::default())?;
 | OpenEXR | yes | yes | F16, F32 | Y, YA, RGB, RGBA | yes | no | no | no | no | no | no | `exr` |
 | Radiance HDR | yes | yes | F32 | RGB | no | no | no | no | no | no | yes (RGBE) | `image` |
 | AVIF | **no** | only with feature `avif` | U8 | RGB, RGBA | yes | no | no | no | no | no | yes | `image` + `ravif` |
-| HEIF/HEIC | yes | **no** | U8, U16 (10/12-bit decodes to U16) | RGB, RGBA | yes (auxiliary alpha) | yes (`colr` prof) | yes | yes | no | no | n/a | `heic-rs` |
+| HEIF/HEIC | with feature `heif` | **no** | U8, U16 (10/12-bit decodes to U16) | RGB, RGBA | yes (auxiliary alpha) | yes (`colr` prof) | yes | yes | no | no | n/a | `heic-rs` |
 
 "Native" means the data is stored and read back without conversion. Anything else is converted by
 the encode plan, and `fidelity_warnings` reports the conversion when it loses information:
@@ -66,7 +66,10 @@ the same.
   with `CodecError::Unsupported`: they are sensor data, not flat images. `photocraft-raw` decodes
   and develops them, and `photocraft-io` routes them there.
 
-* **HEIF/HEIC (read-only).** iPhone and Mac photos decode with `heic-rs` (pure Rust, no `unsafe`):
+* **HEIF/HEIC (read-only, feature `heif`).** Decoding lives in the optional `photocraft-heif` crate
+  behind the non-default `heif` feature (official PhotoCraft builds enable it; distributors choose).
+  Without it, HEIF is still detected and decoding returns `CodecError::Unsupported` ("HEIC/HEIF
+  support isn't included in this build"). iPhone and Mac photos decode with `heic-rs` (pure Rust, no `unsafe`):
   single pictures and grid-tiled photos, 8 to 12 bits, auxiliary alpha, ICC, EXIF and XMP. The
   container's `irot`/`imir`/`clap` are applied and EXIF Orientation is rewritten to 1 (HEIF's EXIF
   tag only repeats the container's, and applying both would turn the photo twice). Grayscale
