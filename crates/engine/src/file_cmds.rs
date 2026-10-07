@@ -142,6 +142,23 @@ pub fn saves_in_place(path: &str) -> bool {
     extension(path).is_some_and(|ext| matches!(ext.as_str(), "psd" | "psb" | "pcraft"))
 }
 
+/// Whether `path` names a document template (.psdt). A template opens as a new untitled document
+/// without its path, so a save never writes over the template.
+pub fn is_template(path: &str) -> bool {
+    extension(path).as_deref() == Some("psdt")
+}
+
+/// The first "`base`-N" that isn't `taken`.
+pub fn untitled_name(base: &str, taken: impl Fn(&str) -> bool) -> String {
+    (1..).map(|i| format!("{base}-{i}")).find(|n| !taken(n)).unwrap_or_default()
+}
+
+/// The name a document opened from `path` gets when `path` is a template: the first "Untitled-N"
+/// no open document has.
+pub fn template_name(s: &Session, path: &str) -> Option<String> {
+    is_template(path).then(|| untitled_name("Untitled", |n| s.documents().iter().any(|d| d.doc.name == n)))
+}
+
 pub(crate) fn stem(path: &str) -> String {
     let n = file_name(path);
     match n.rfind('.') {
@@ -316,7 +333,16 @@ pub fn open_bytes_as(s: &mut Session, name: &str, bytes: &[u8], as_ext: Option<&
     };
     let r = photocraft_io::import(&decode_name, bytes).map_err(|e| EngineError::Other(format!("{decode_name}: {e}")))?;
     let mut doc = r.document;
-    doc.name = file_name(name);
+    let path = match template_name(s, name) {
+        Some(untitled) => {
+            doc.name = untitled;
+            None
+        }
+        None => {
+            doc.name = file_name(name);
+            path
+        }
+    };
     // Color Settings policies (preserve / convert / discard the embedded profile).
     let (i, color) = s.open_document(doc, path);
     // Import notes (e.g. how a camera raw was developed, or that only its preview opened).
@@ -331,6 +357,9 @@ fn open_as(s: &mut Session, p: &Value) -> Result<Value> {
 }
 
 // ---------- place ----------
+
+/// History label of an embedded place.
+pub const PLACE_EMBEDDED: &str = "Place Embedded";
 
 /// Place a file's bytes as a smart object layer, centred and (when larger than the canvas)
 /// scaled down to fit, like Photoshop's Place with "Resize Image During Place". `linked` makes it
@@ -362,7 +391,7 @@ pub fn place_bytes(s: &mut Session, name: &str, bytes: Vec<u8>, linked: Option<S
     };
     let so = SmartObject::new(source, Affine { m: [scale, 0.0, 0.0, scale, dx, dy] }, Some(px));
     let layer_name = stem(name);
-    let label = if matches!(so.source, SmartSource::Linked { .. }) { "Place Linked" } else { "Place Embedded" };
+    let label = if matches!(so.source, SmartSource::Linked { .. }) { "Place Linked" } else { PLACE_EMBEDDED };
     let id = s.edit(label, |doc, active| {
         let id = doc.insert_above(*active, Layer::new(layer_name, LayerContent::Smart(so)));
         *active = Some(id);
@@ -980,8 +1009,19 @@ fn new_guide_layout(s: &mut Session, p: &Value) -> Result<Value> {
         _ => [0.0; 4],
     };
     let [top, left, bottom, right] = m;
-    let cols = p.get("columns").and_then(Value::as_u64).unwrap_or(0) as u32;
-    let rows = p.get("rows").and_then(Value::as_u64).unwrap_or(0) as u32;
+    let cols = p.get("columns").and_then(Value::as_u64).unwrap_or(0);
+    let rows = p.get("rows").and_then(Value::as_u64).unwrap_or(0);
+    // Each column/row costs a loop iteration plus a duplicate scan, so an
+    // absurd count from the caller would block the app for minutes (#704).
+    // Photoshop's own dialog caps at 32; 1000 is a generous ceiling that
+    // still finishes instantly.
+    const MAX_GUIDE_LINES: u64 = 1000;
+    for (n, what) in [(cols, "columns"), (rows, "rows")] {
+        if n > MAX_GUIDE_LINES {
+            return Err(EngineError::BadParams { cmd: "view.newGuideLayout".into(), msg: format!("{what} must be {MAX_GUIDE_LINES} or fewer (got {n})") });
+        }
+    }
+    let (cols, rows) = (cols as u32, rows as u32);
     let mut v: Vec<f32> = Vec::new();
     let mut h: Vec<f32> = Vec::new();
     let has_margin = m.iter().any(|x| *x != 0.0);
