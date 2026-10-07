@@ -73,6 +73,18 @@ fn tmp(name: &str) -> std::path::PathBuf {
     d
 }
 
+/// Removes a test directory. The server task spawned by `connect` is still closing its files for
+/// a moment after the client cancels, and Windows refuses to delete an open file, so this retries
+/// briefly; whatever is left is cleared by the next run's `tmp`.
+fn cleanup(dir: &std::path::Path) {
+    for _ in 0..40 {
+        if std::fs::remove_dir_all(dir).is_ok() || !dir.exists() {
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
 /// A 64×48 RGB gradient PNG (red ramps across, green down).
 fn gradient_png(dir: &std::path::Path) -> &'static str {
     let (w, h) = (64u32, 48u32);
@@ -212,7 +224,7 @@ async fn agent_completes_ten_scripted_tasks() {
     assert_eq!(doc["layers"].as_array().unwrap().len(), 4, "task 10");
 
     c.cancel().await.unwrap();
-    std::fs::remove_dir_all(dir).unwrap();
+    cleanup(&dir);
 }
 
 /// Click just after "Big", insert a word, then bold through the end of the line. Geometry comes
@@ -263,7 +275,7 @@ async fn agent_edits_text_by_position() {
 
     tool(&c, "doc_close", json!({})).await;
     c.cancel().await.unwrap();
-    std::fs::remove_dir_all(dir).unwrap();
+    cleanup(&dir);
 }
 
 async fn connect_headless(headless: photocraft_automation::Headless) -> Conn {
@@ -307,7 +319,7 @@ async fn agent_records_and_replays_an_action() {
     assert!(close(&px, &[1.0, 0.0, 0.0, 1.0], 1e-4), "{px:?}");
 
     c.cancel().await.unwrap();
-    std::fs::remove_dir_all(dir).unwrap();
+    cleanup(&dir);
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -328,5 +340,5 @@ async fn agent_play_refuses_a_recorded_file_open() {
     let session = tool(&c, "session_list", json!({})).await;
     assert!(session["documents"].as_array().is_some_and(|d| d.is_empty()), "{session}");
     c.cancel().await.unwrap();
-    std::fs::remove_dir_all(dir).unwrap();
+    cleanup(&dir);
 }
