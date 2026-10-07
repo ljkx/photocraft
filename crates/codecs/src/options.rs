@@ -118,6 +118,9 @@ pub struct EncodeOptions {
     /// yields [`CodecError::Unsupported`].
     pub webp_lossless: bool,
     pub tiff_compression: TiffCompression,
+    /// Always write TIFF as BigTIFF (8-byte offsets). Without it a TIFF is written as BigTIFF
+    /// only when it could pass the 4 GiB a classic TIFF can address.
+    pub tiff_bigtiff: bool,
     pub exr_compression: ExrCompression,
     /// Embed the ICC profile when the format supports it.
     pub embed_icc: bool,
@@ -134,6 +137,7 @@ impl Default for EncodeOptions {
             png_interlaced: false,
             webp_lossless: true,
             tiff_compression: TiffCompression::Deflate,
+            tiff_bigtiff: false,
             exr_compression: ExrCompression::Zip16,
             embed_icc: true,
             embed_metadata: true,
