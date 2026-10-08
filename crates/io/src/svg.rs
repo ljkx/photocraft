@@ -60,8 +60,24 @@ fn fonts() -> Arc<usvg::fontdb::Database> {
     .clone()
 }
 
+/// Parse options for an untrusted drawing. `<image href>` resolves only `data:` URLs: a file path
+/// or relative href is never read, so opening an SVG cannot pull local files (`/etc/...`,
+/// `~/.ssh/...`) into the document. Embedded SVG images get no `<image>` resolution at all
+/// (`usvg` already blanks it for sub-SVGs). The font database (and its one-off scan of the system
+/// fonts) is only loaded when the drawing may contain text.
+fn options(bytes: &[u8]) -> usvg::Options<'static> {
+    // `.svgz` is gzip: it can't be scanned before usvg inflates it, so assume it has text.
+    let has_text = bytes.starts_with(&[0x1f, 0x8b]) || bytes.windows(4).any(|w| w == b"text");
+    usvg::Options {
+        resources_dir: None,
+        image_href_resolver: usvg::ImageHrefResolver { resolve_data: usvg::ImageHrefResolver::default_data_resolver(), resolve_string: Box::new(|_, _| None) },
+        fontdb: if has_text { fonts() } else { Arc::new(usvg::fontdb::Database::new()) },
+        ..usvg::Options::default()
+    }
+}
+
 fn parse(bytes: &[u8]) -> Result<usvg::Tree, IoError> {
-    let opt = usvg::Options { fontdb: fonts(), ..usvg::Options::default() };
+    let opt = options(bytes);
     usvg::Tree::from_data(bytes, &opt).map_err(|e| IoError::Svg(e.to_string()))
 }
 

@@ -254,3 +254,26 @@ fn an_svg_round_trips_through_pcraft_as_shapes() {
     assert!(back.layers.iter().all(|l| matches!(l.content, LayerContent::Shape(_))));
     assert!(close(px(&back, 10, 10), px(&r.document, 10, 10)));
 }
+
+#[test]
+fn image_hrefs_to_local_files_are_never_read() {
+    // A real PNG on disk, referenced by absolute path and as a file URL: opening an untrusted
+    // drawing must not pull it in (only `data:` URLs resolve).
+    let dir = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("svg-local-image");
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("secret.png");
+    let img = photocraft_codecs::Image::from_u8(2, 2, photocraft_codecs::ChannelLayout::Rgb, vec![255; 12]).unwrap();
+    std::fs::write(&file, photocraft_codecs::encode(&img, photocraft_codecs::Format::Png, &Default::default()).unwrap()).unwrap();
+    let path = file.to_string_lossy().into_owned();
+    for href in [path.clone(), format!("file://{path}"), "secret.png".to_string()] {
+        let r = open(&format!("<svg {NS} width=\"20\" height=\"20\"><image x=\"0\" y=\"0\" width=\"20\" height=\"20\" href=\"{href}\"/></svg>"));
+        let d = &r.document;
+        assert!(d.layers.iter().all(|l| !matches!(l.content, LayerContent::Raster(_))), "{href}: {:?}", d.layers.len());
+        assert!(px(d, 10, 10)[3] < 0.01, "{href}: {:?}", px(d, 10, 10));
+    }
+    // The same picture as a data URL still loads.
+    assert!(matches!(
+        open(&format!("<svg {NS} width=\"20\" height=\"20\"><image width=\"20\" height=\"20\" href=\"{}\"/></svg>", png_data_url())).document.layers[0].content,
+        LayerContent::Raster(_)
+    ));
+}
