@@ -1103,14 +1103,16 @@ fn tab_context_items(index: usize, count: usize) -> [(&'static str, &'static str
 }
 
 fn tab_context_menu(ui: &mut egui::Ui, index: usize, count: usize) -> Option<(&'static str, serde_json::Value)> {
-    ui.set_min_width(170.0);
-    for (label, id, params, enabled) in tab_context_items(index, count) {
-        if ui.add_enabled(enabled, egui::Button::new(tl!(label))).clicked() {
-            ui.close();
-            return Some((id, params));
+    crate::widgets::menu_scroll(ui, |ui| {
+        ui.set_min_width(170.0);
+        for (label, id, params, enabled) in tab_context_items(index, count) {
+            if ui.add_enabled(enabled, egui::Button::new(tl!(label))).clicked() {
+                ui.close();
+                return Some((id, params));
+            }
         }
-    }
-    None
+        None
+    })
 }
 
 /// Apply tab-strip clicks: a document tab shows that document, an opening tab its progress, and
@@ -2422,6 +2424,10 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
     }
     // Move tool: ⇧ locks the axis, ⌥ duplicates (move_mods.rs).
     let ev = crate::move_mods::filter_event(app, ev, mods);
+    // Direct Selection, and the Pen's ⌘ (Direct Selection) and ⌥ (Convert Point) modes (#790).
+    if crate::direct_select::pointer(app, ev, mods) {
+        return;
+    }
     // Ruler, Count and Note tools.
     if crate::analysis_ui::pointer(app, ev, mods) {
         return;
