@@ -1808,6 +1808,7 @@
 	Maximize psd compatibility	PSD の互換性を最大にする
 	Medium gray	中間グレー
 	Memory usage mb	メモリ使用量 (MB)
+	Low resolution previews	低解像度プレビュー
 	Missing glyph protection	字形欠落の保護
 	Modern	モダン
 	Nearest neighbor	ニアレストネイバー
@@ -2131,3 +2132,17 @@ cameraRaw	Color	カラー
 	Channels:	チャンネル:
 	Knockout	ノックアウト
 	Apply At Canvas Bounds	カンバスの境界に効果を適用
+
+# Fill dialog, layer style contours and Image Size
+	Contents:	内容:
+	Custom Pattern:	カスタムパターン:
+	Foreground Color	描画色
+	Color…	カラー…
+	50% Gray	50% グレー
+	Color Adaptation	カラー適応
+	{size} (was {old})	{size}(変更前 {old})
+	Cone	円錐
+	Cone (Inverted)	円錐 (反転)
+	Domed	ドーム
+	Domed (Inverted)	ドーム (反転)
+	Diagonal (Descending)	斜め (下降)

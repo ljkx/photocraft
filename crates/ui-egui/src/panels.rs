@@ -1,6 +1,6 @@
 //! Chrome around the canvas: title bar, options bar, toolbar, status bar, dock cards, Properties.
 
-use egui::{Align2, Color32, CornerRadius, Rect, RichText, Sense, Stroke, StrokeKind, Vec2, pos2, vec2};
+use egui::{Align2, Color32, CornerRadius, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, Vec2, pos2, vec2};
 use photocraft_color::BlendMode;
 use photocraft_doc::{Layer, LayerContent, LayerId};
 use serde_json::{Value, json};
@@ -1388,6 +1388,28 @@ fn blend_options(groups: bool) -> Vec<(BlendMode, &'static str)> {
     std::iter::once(BlendMode::PassThrough).filter(|_| groups).chain(BlendMode::LAYER_MODES).map(|m| (m, m.label())).collect()
 }
 
+/// Scroll the Layers panel while holding a layer drag over its top/bottom edge.
+///
+/// Returns the *content* displacement in points for this frame, so positive moves the
+/// list downward (reveals rows above) and negative upward (reveals rows below).
+/// The speed ramps with proximity to the edge and uses elapsed time instead of
+/// assuming a particular refresh rate.
+fn layer_drag_edge_scroll(pointer: Option<Pos2>, viewport: Rect, dragging: bool, dt: f32) -> f32 {
+    if !dragging || viewport.width() <= 0.0 || viewport.height() <= 0.0 {
+        return 0.0;
+    }
+    let Some(pointer) = pointer.filter(|p| viewport.contains(*p)) else { return 0.0 };
+    let edge = 32.0_f32.min(viewport.height() * 0.25);
+    let top = (edge - (pointer.y - viewport.top())).max(0.0) / edge;
+    let bottom = (edge - (viewport.bottom() - pointer.y)).max(0.0) / edge;
+    let direction = top - bottom;
+    if direction == 0.0 {
+        return 0.0;
+    }
+    let velocity = 80.0 + 520.0 * direction.abs();
+    direction.signum() * velocity * dt.clamp(0.0, 0.05)
+}
+
 fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // A new active layer opens its parent groups and is scrolled into view (#152).
     let reveal = crate::layer_reveal::track(app, ui.ctx());
@@ -1516,6 +1538,15 @@ fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .min_scrolled_height(if fill { rows_h } else { 0.0 })
         .auto_shrink([false, !fill])
         .show(ui, |ui| {
+            // The drag key is set only by actual layer-row drags, not clicks or
+            // ordinary scrolling. The ScrollArea applies this to its own content.
+            let dragging = ctx.data(|d| d.get_temp::<u64>(egui::Id::new("layer-drag"))).is_some() && ctx.input(|i| i.pointer.primary_down());
+            let pointer = ctx.input(|i| i.pointer.interact_pos());
+            let delta = layer_drag_edge_scroll(pointer, ui.clip_rect(), dragging, ctx.input(|i| i.stable_dt));
+            if delta != 0.0 {
+                ui.scroll_with_delta(vec2(0.0, delta));
+                ctx.request_repaint();
+            }
             let filter = app.ui.layer_filter.clone();
             let fx_collapsed = app.session.active().map(|d| d.fx_collapsed.clone()).unwrap_or_default();
             crate::layer_row_ui::begin(ui.ctx());
@@ -1786,7 +1817,7 @@ fn layer_row(
     // Photoshop's default (medium) thumbnails: 32 pt rows.
     let row_h = if t.pro { 32.0 } else { 46.0 };
     let (rect, resp) = ui.allocate_exact_size(vec2(ui.available_width(), row_h), Sense::click_and_drag());
-    layer_drag_and_drop(ctx, ui, l, rect, &resp, actions);
+    layer_drag_and_drop(app, ctx, ui, l, rect, &resp, actions);
     if resp.drag_started() {
         crate::layer_transfer::begin_from_panel(app, ctx, l.id);
     }
@@ -2645,9 +2676,27 @@ fn brush_preset_chip(ui: &mut egui::Ui, b: &photocraft_engine::BrushSettings, st
     }
 }
 
-/// Drag a layer row to reorder: drop on the upper/lower half to place above/below, or on the middle
-/// of a group to move into it. One `layer.moveTo` command (one undo step).
-fn layer_drag_and_drop(ctx: &egui::Context, ui: &egui::Ui, l: &Layer, rect: Rect, resp: &egui::Response, actions: &mut Vec<(String, Value)>) {
+/// A drag from within a multi-selection moves the whole selection, not only the grabbed
+/// row. Dragging an unselected row keeps the existing single-layer behavior.
+fn layer_drop_payload(dragged: u64, target: LayerId, position: &str, selected: &[LayerId]) -> Value {
+    if selected.len() > 1 && selected.contains(&LayerId(dragged)) {
+        json!({"layers": selected.iter().map(|id| id.0).collect::<Vec<_>>(), "target": target.0, "position": position})
+    } else {
+        json!({"layer": dragged, "target": target.0, "position": position})
+    }
+}
+
+/// Drag a layer row to reorder: drop above, below, or inside an existing group.
+/// Multi-layer moves are atomic (one undo step), using the engine's stable document order.
+fn layer_drag_and_drop(
+    app: &PhotocraftApp,
+    ctx: &egui::Context,
+    ui: &egui::Ui,
+    l: &Layer,
+    rect: Rect,
+    resp: &egui::Response,
+    actions: &mut Vec<(String, Value)>,
+) {
     let t = Tokens::get(ctx);
     let key = egui::Id::new("layer-drag");
     if resp.drag_started() {
@@ -2688,7 +2737,8 @@ fn layer_drag_and_drop(ctx: &egui::Context, ui: &egui::Ui, l: &Layer, rect: Rect
         }
     }
     if released {
-        actions.push(("layer.moveTo".into(), json!({"layer": dragged, "target": l.id.0, "position": position})));
+        let selected = app.session.active().map(|st| st.selected_layers()).unwrap_or_default();
+        actions.push(("layer.moveTo".into(), layer_drop_payload(dragged, l.id, position, &selected)));
     }
 }
 
@@ -3258,5 +3308,76 @@ mod toolbar_tests {
         h.run_steps(2);
         assert!(!h.state().ui.panels.toolbar_double);
         assert_eq!(left(&h), single);
+    }
+}
+
+#[cfg(test)]
+mod layer_drag_edge_scroll_tests {
+    use super::*;
+
+    #[test]
+    fn scrolls_both_edges_with_distance_dependent_velocity() {
+        let viewport = Rect::from_min_max(pos2(10.0, 30.0), pos2(310.0, 330.0));
+        let point = |y| Some(pos2(100.0, y));
+        let near_top = layer_drag_edge_scroll(point(33.0), viewport, true, 1.0 / 60.0);
+        let far_top = layer_drag_edge_scroll(point(53.0), viewport, true, 1.0 / 60.0);
+        let near_bottom = layer_drag_edge_scroll(point(327.0), viewport, true, 1.0 / 60.0);
+        let far_bottom = layer_drag_edge_scroll(point(307.0), viewport, true, 1.0 / 60.0);
+        assert!(near_top > far_top && far_top > 0.0, "approaching the top reveals earlier rows");
+        assert!(near_bottom < far_bottom && far_bottom < 0.0, "approaching the bottom reveals later rows");
+        assert!((near_top + near_bottom).abs() < 1e-5, "symmetric edge behavior");
+        assert_eq!(layer_drag_edge_scroll(point(160.0), viewport, true, 1.0 / 60.0), 0.0);
+    }
+
+    #[test]
+    fn scrolling_stops_outside_or_after_the_drag_finishes() {
+        let viewport = Rect::from_min_max(pos2(10.0, 30.0), pos2(310.0, 330.0));
+        let active = Some(pos2(100.0, 325.0));
+        assert_eq!(layer_drag_edge_scroll(active, viewport, false, 1.0 / 60.0), 0.0);
+        assert_eq!(layer_drag_edge_scroll(None, viewport, true, 1.0 / 60.0), 0.0);
+        assert_eq!(layer_drag_edge_scroll(Some(pos2(9.0, 325.0)), viewport, true, 1.0 / 60.0), 0.0);
+        assert_eq!(layer_drag_edge_scroll(Some(pos2(100.0, 335.0)), viewport, true, 1.0 / 60.0), 0.0);
+        assert_eq!(layer_drag_edge_scroll(active, viewport, true, 0.0), 0.0);
+        let step = layer_drag_edge_scroll(active, viewport, true, 1.0 / 60.0);
+        let twice = layer_drag_edge_scroll(active, viewport, true, 2.0 / 60.0);
+        assert!((twice - step * 2.0).abs() < 1e-4, "time-based scrolling scales across refresh rates");
+        assert!(layer_drag_edge_scroll(active, viewport, true, 0.5).abs() <= 30.0, "long frames have a bounded step");
+    }
+
+    #[test]
+    fn short_viewports_keep_the_edge_zones_disjoint() {
+        let viewport = Rect::from_min_max(pos2(0.0, 0.0), pos2(150.0, 40.0));
+        assert!(layer_drag_edge_scroll(Some(pos2(10.0, 2.0)), viewport, true, 0.016) > 0.0);
+        assert!(layer_drag_edge_scroll(Some(pos2(10.0, 38.0)), viewport, true, 0.016) < 0.0);
+        assert_eq!(layer_drag_edge_scroll(Some(pos2(10.0, 20.0)), viewport, true, 0.016), 0.0);
+    }
+}
+
+#[cfg(test)]
+mod group_drag_selection_tests {
+    use super::*;
+
+    #[test]
+    fn dragging_a_selected_layer_moves_the_complete_selection_into_a_group() {
+        let a = LayerId(10);
+        let b = LayerId(11);
+        let group = LayerId(20);
+        let payload = layer_drop_payload(a.0, group, "into", &[a, b]);
+        assert_eq!(payload, json!({"layers": [10, 11], "target": 20, "position": "into"}));
+        assert_eq!(payload.get("layer"), None, "batch drops must not also send a single layer");
+
+        // Above/below use the same batch route; engine preserves the document stack order.
+        assert_eq!(layer_drop_payload(b.0, group, "above", &[a, b])["position"], "above");
+        assert_eq!(layer_drop_payload(b.0, group, "below", &[a, b])["position"], "below");
+    }
+
+    #[test]
+    fn dragging_unselected_or_singular_row_remains_a_single_layer_move() {
+        let a = LayerId(10);
+        let b = LayerId(11);
+        let group = LayerId(20);
+        assert_eq!(layer_drop_payload(9, group, "into", &[a, b]), json!({"layer": 9, "target": 20, "position": "into"}));
+        assert_eq!(layer_drop_payload(a.0, group, "above", &[a]), json!({"layer": 10, "target": 20, "position": "above"}));
+        assert_eq!(layer_drop_payload(a.0, group, "below", &[]), json!({"layer": 10, "target": 20, "position": "below"}));
     }
 }
