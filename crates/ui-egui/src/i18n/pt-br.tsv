@@ -1780,6 +1780,7 @@
 	Maximize psd compatibility	Maximizar compatibilidade de PSD
 	Medium gray	Cinza médio
 	Memory usage mb	Uso de memória (MB)
+	Low resolution previews	Visualizações em baixa resolução
 	Missing glyph protection	Proteção de glifos ausentes
 	Modern	Moderno
 	Nearest neighbor	Vizinho mais próximo
@@ -2593,3 +2594,16 @@ cameraRaw	Whites	Brancos
 	Reset Swatches	Redefinir amostras
 	Add to Swatches	Adicionar às amostras
 	Apply At Canvas Bounds	Aplicar efeito nos limites da tela
+
+# Fill dialog, layer style contours and Image Size
+	Contents:	Conteúdo:
+	Custom Pattern:	Padrão personalizado:
+	Foreground Color	Cor de primeiro plano
+	Color…	Cor…
+	50% Gray	Cinza 50%
+	{size} (was {old})	{size} (antes {old})
+	Cone	Cone
+	Cone (Inverted)	Cone (invertido)
+	Domed	Abaulado
+	Domed (Inverted)	Abaulado (invertido)
+	Diagonal (Descending)	Diagonal (descendente)

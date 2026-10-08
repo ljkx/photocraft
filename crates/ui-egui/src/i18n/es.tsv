@@ -1803,6 +1803,7 @@
 	Maximize psd compatibility	Maximizar la compatibilidad de PSD
 	Medium gray	Gris medio
 	Memory usage mb	Uso de memoria (MB)
+	Low resolution previews	Previsualizaciones de baja resolución
 	Missing glyph protection	Protección de glifos faltantes
 	Modern	Moderno
 	Nearest neighbor	Vecino más cercano
@@ -2226,3 +2227,16 @@ cameraRaw	Amount	Cantidad
 	Reset Swatches	Restablecer muestras
 	Add to Swatches	Añadir a muestras
 	Apply At Canvas Bounds	Aplicar efecto en los límites del lienzo
+
+# Fill dialog, layer style contours and Image Size
+	Contents:	Contenido:
+	Custom Pattern:	Patrón personalizado:
+	Foreground Color	Color frontal
+	Color…	Color…
+	50% Gray	Gris al 50%
+	{size} (was {old})	{size} (antes {old})
+	Cone	Cono
+	Cone (Inverted)	Cono (invertido)
+	Domed	Abovedado
+	Domed (Inverted)	Abovedado (invertido)
+	Diagonal (Descending)	Diagonal (descendente)

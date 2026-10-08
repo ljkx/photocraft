@@ -1803,6 +1803,7 @@
 	Maximize psd compatibility	最大化 PSD 相容性
 	Medium gray	中灰
 	Memory usage mb	記憶體使用量 (MB)
+	Low resolution previews	低解析度預覽
 	Missing glyph protection	缺少字符保護
 	Modern	現代
 	Nearest neighbor	最接近像素
@@ -2132,3 +2133,17 @@ cameraRaw	Blending	混合
 	Reset Swatches	重設色票
 	Add to Swatches	加入色票
 	Apply At Canvas Bounds	套用效果至版面邊界
+
+# Fill dialog, layer style contours and Image Size
+	Contents:	內容：
+	Custom Pattern:	自訂圖樣：
+	Foreground Color	前景色
+	Color…	顏色…
+	50% Gray	50% 灰色
+	Color Adaptation	顏色適應
+	{size} (was {old})	{size}（原為 {old}）
+	Cone	錐形
+	Cone (Inverted)	錐形（反轉）
+	Domed	圓頂
+	Domed (Inverted)	圓頂（反轉）
+	Diagonal (Descending)	對角線（下降）

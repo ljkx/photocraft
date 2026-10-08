@@ -1775,6 +1775,7 @@
 	Maximize psd compatibility	Maksimalkan kompatibilitas PSD
 	Medium gray	Abu-abu sedang
 	Memory usage mb	Pemakaian memori MB
+	Low resolution previews	Pratinjau resolusi rendah
 	Missing glyph protection	Perlindungan glyph hilang
 	Modern	Modern
 	Nearest neighbor	Nearest neighbor
@@ -2573,3 +2574,16 @@ cameraRaw	Blending	Pembauran
 	Reset Swatches	Atur Ulang Swatch
 	Add to Swatches	Tambahkan ke Swatch
 	Apply At Canvas Bounds	Terapkan efek di batas kanvas
+
+# Fill dialog, layer style contours and Image Size
+	Contents:	Isi:
+	Custom Pattern:	Pola Kustom:
+	Foreground Color	Warna Foreground
+	Color…	Warna…
+	50% Gray	Abu-abu 50%
+	{size} (was {old})	{size} (sebelumnya {old})
+	Cone	Kerucut
+	Cone (Inverted)	Kerucut (Terbalik)
+	Domed	Kubah
+	Domed (Inverted)	Kubah (Terbalik)
+	Diagonal (Descending)	Diagonal (Menurun)

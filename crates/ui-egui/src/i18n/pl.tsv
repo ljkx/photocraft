@@ -1802,6 +1802,7 @@
 	Language	Język
 	Large tabs	Duże karty
 	Legacy compositing	Starszy sposób komponowania
+	Low resolution previews	Podglądy w niskiej rozdzielczości
 	Light gray	Jasnoszary
 	Line	Linia
 	Lines	Linie
@@ -3196,3 +3197,15 @@ cameraRaw	Roughness	Chropowatość
 	Add to Swatches	Dodaj do próbek
 	New Brush Preset…	Nowe ustawienie wstępne pędzla…
 	Brush Preset Options	Opcje ustawień wstępnych pędzla
+
+# Fill dialog, layer style contours and Image Size
+	Contents:	Zawartość:
+	Custom Pattern:	Własny wzór:
+	Foreground Color	Kolor pierwszego planu
+	Color…	Kolor…
+	50% Gray	50% szarości
+	{size} (was {old})	{size} (wcześniej {old})
+	Cone (Inverted)	Stożek (odwrócony)
+	Domed	Kopuła
+	Domed (Inverted)	Kopuła (odwrócona)
+	Diagonal (Descending)	Przekątna (malejąca)
