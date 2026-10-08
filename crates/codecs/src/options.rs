@@ -114,9 +114,11 @@ pub struct EncodeOptions {
     pub png_compression: PngCompression,
     /// Write Adam7-interlaced PNG.
     pub png_interlaced: bool,
-    /// WebP: only lossless encoding is available in pure Rust; `false`
-    /// yields [`CodecError::Unsupported`].
+    /// WebP: lossless (VP8L, via `image-webp`) or lossy (our VP8 encoder, see
+    /// `codecs::vp8`) with [`Self::webp_quality`].
     pub webp_lossless: bool,
+    /// Lossy WebP quality 0..=100 (the source application's scale; 75–85 is typical for photos).
+    pub webp_quality: u8,
     pub tiff_compression: TiffCompression,
     /// Always write TIFF as BigTIFF (8-byte offsets). Without it a TIFF is written as BigTIFF
     /// only when it could pass the 4 GiB a classic TIFF can address.
@@ -136,6 +138,7 @@ impl Default for EncodeOptions {
             png_compression: PngCompression::Default,
             png_interlaced: false,
             webp_lossless: true,
+            webp_quality: 80,
             tiff_compression: TiffCompression::Deflate,
             tiff_bigtiff: false,
             exr_compression: ExrCompression::Zip16,

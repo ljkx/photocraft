@@ -73,6 +73,7 @@ pub mod layer_style;
 pub mod layer_tree_ui;
 pub mod links;
 pub mod liquify_ui;
+pub mod magnetic_lasso_ui;
 pub mod mask_thumbs_ui;
 pub mod menu_catalog;
 pub mod menu_nav;
@@ -152,6 +153,10 @@ pub type ImportFn = Box<dyn Fn(&str, &[u8]) -> Result<(Document, Vec<String>), S
 pub struct ExportSettings {
     /// JPEG quality 1–100 (None = codec default).
     pub jpeg_quality: Option<u8>,
+    /// WebP: lossless (VP8L) rather than lossy (VP8 at [`Self::webp_quality`]).
+    pub webp_lossless: bool,
+    /// Lossy WebP quality 1–100 (None = codec default).
+    pub webp_quality: Option<u8>,
     /// TIFF: keep the layers (Photoshop layer data); `false` is "Discard Layers and Save a Copy".
     pub tiff_layers: bool,
     /// Embed the document's whole XMP packet. `true` by default (Save As keeps the metadata);
@@ -162,7 +167,7 @@ pub struct ExportSettings {
 
 impl Default for ExportSettings {
     fn default() -> Self {
-        ExportSettings { jpeg_quality: None, tiff_layers: true, xmp_all: true }
+        ExportSettings { jpeg_quality: None, webp_lossless: true, webp_quality: None, tiff_layers: true, xmp_all: true }
     }
 }
 
@@ -300,6 +305,8 @@ pub struct PhotocraftApp {
     pub(crate) move_preview: Option<move_ui::MovePreview>,
     /// Patch Tool drag: the healed document at the pointer (`patch_preview`).
     pub(crate) patch_preview: Option<patch_preview::PatchPreview>,
+    /// The pixels a Magnetic Lasso border follows (`magnetic_lasso_ui`).
+    pub(crate) magnetic: magnetic_lasso_ui::Runtime,
     /// The next tool `Down` is a right-button drag that erases (see `paint_mouse`).
     secondary_erase: bool,
     /// While a batch of recovered pointer samples is replayed, defer the live-stroke update to one
@@ -452,6 +459,7 @@ impl PhotocraftApp {
             trail: None,
             move_preview: None,
             patch_preview: None,
+            magnetic: Default::default(),
             secondary_erase: false,
             defer_live_stroke: false,
             last_stroke_end: None,

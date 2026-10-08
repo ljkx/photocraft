@@ -1762,6 +1762,7 @@
 	Light gray	밝은 회색
 	Line	선
 	Lines	선
+	Lossless	무손실
 	Lowercase extension	소문자 확장자
 	Maximize psd compatibility	PSD 호환성 최대화
 	Medium gray	중간 회색
@@ -2035,6 +2036,13 @@ cameraRaw	Color	색상
 	250%	250%
 	300%	300%
 	Full-resolution preview unavailable	전체 해상도 미리보기를 사용할 수 없습니다
+
+
+	New Style…	새 스타일…
+	Style {name} saved	{name} 스타일을 저장했습니다
+
+	Make Default	기본값으로 만들기
+	Reset to Default	기본값으로 되돌리기
 
 # Additional generated filter labels and Photoshop-aligned UI terminology.
 @id	select.all	모두 선택
@@ -2668,3 +2676,6 @@ cameraRaw	Color	색상
 	Save failed: {error}	저장 실패: {error}
 	Save cancelled	저장이 취소되었습니다
 	Couldn't place {name}: {error}	{name}을(를) 가져올 수 없습니다: {error}
+	Magnetic Lasso Tool	자석 올가미 도구
+	Frequency	빈도
+	Use tablet pressure to change pen width	태블릿 압력을 사용하여 펜 폭 변경
