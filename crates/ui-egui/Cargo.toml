@@ -16,6 +16,7 @@ photocraft-doc = { workspace = true }
 photocraft-compose = { workspace = true }
 photocraft-gpu = { workspace = true }
 photocraft-engine = { workspace = true }
+photocraft-io = { workspace = true }
 photocraft-plugins = { workspace = true }
 photocraft-algo = { workspace = true }
 photocraft-text = { workspace = true }
@@ -38,7 +39,8 @@ rayon = { workspace = true }
 sys-locale = "=0.3.2"
 
 [dev-dependencies]
-photocraft-io = { workspace = true }
+# Synthetic raw files for the open-time Camera Raw dialog tests.
+photocraft-raw = { workspace = true, features = ["testgen"] }
 egui_kittest = { workspace = true, features = ["wgpu", "snapshot", "eframe"] }
 # Benchmark helpers for the `--json` benches `cargo xtask perf` runs (in-process RSS, percentiles).
 photocraft-testkit = { workspace = true }
