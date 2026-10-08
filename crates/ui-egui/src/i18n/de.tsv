@@ -103,6 +103,7 @@
 	Fill…	Füllen…
 	Stroke…	Nachziehen…
 	Content-Aware Fill…	Inhaltsbasiert füllen…
+	Delete and Fill Selection	Auswahl löschen und füllen
 	Content-Aware Scale	Inhaltsbasiert skalieren
 	Puppet Warp	Marionetten-Verkrümmung
 	Perspective Warp	Perspektivisch verkrümmen
@@ -2177,3 +2178,4 @@
 	Blend If:	Farbbereich:
 	Channels:	Kanäle:
 	Knockout	Aussparung
+	Apply At Canvas Bounds	Effekt an Arbeitsflächenbegrenzungen anwenden
