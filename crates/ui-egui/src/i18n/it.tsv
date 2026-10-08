@@ -99,6 +99,7 @@
 	Fill…	Riempi…
 	Stroke…	Traccia…
 	Content-Aware Fill…	Riempimento in base al contenuto…
+	Delete and Fill Selection	Elimina e riempi selezione
 	Content-Aware Scale	Scala in base al contenuto
 	Puppet Warp	Altera marionetta
 	Perspective Warp	Altera prospettiva
@@ -2217,3 +2218,4 @@ cameraRaw	Amount	Quantità
 	Reset Swatches	Ripristina campioni
 	Add to Swatches	Aggiungi ai campioni
 	Convert to Layers	Converti in livelli
+	Apply At Canvas Bounds	Applica effetto ai limiti dell’area di lavoro
