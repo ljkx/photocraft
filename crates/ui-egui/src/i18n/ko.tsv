@@ -1927,6 +1927,8 @@
 	Brush Settings…  (F5): every option of this brush	브러시 설정…  (F5): 이 브러시의 모든 옵션
 	Rename Brush…	브러시 이름 바꾸기…
 	Delete Brush	브러시 삭제
+	New Brush Preset…	새 브러시 사전 설정…
+	Brush Preset Options	브러시 사전 설정 옵션
 	Group name	그룹 이름
 	Brush name	브러시 이름
 	Grid view	격자 보기
@@ -2726,3 +2728,5 @@ cameraRaw	Color	색상
 	Lines +/−	줄 +/−
 	@{login}: {prs} PRs, {commits} commits, +{added} / −{deleted} lines (Δ {delta}), +{binAdded} / −{binDeleted} binary assets, {first} – {last}	@{login}: PR {prs}개, 커밋 {commits}개, 줄 +{added} / −{deleted} (Δ {delta}), 바이너리 +{binAdded} / −{binDeleted}, {first} – {last}
 	Apply At Canvas Bounds	캔버스 경계에 효과 적용
+	Good	좋음
+	Best	최적
