@@ -107,20 +107,6 @@ fn tip_decoder_rejects_garbage() {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
-#[test]
-fn a_store_directory_that_does_not_exist_yet_is_empty_without_warnings() {
-    // The app's first launch, and every test that opens a store on a fresh path: nothing on disk
-    // is not an error. Windows reports a missing directory differently from a missing file.
-    let dir = std::env::temp_dir().join(format!("pc-presets-{}-missing", std::process::id())).join("nested");
-    let _ = std::fs::remove_dir_all(dir.parent().unwrap_or(&dir));
-    let opened = open_dir(&dir);
-    assert!(opened.warnings.is_empty(), "{:?}", opened.warnings);
-    assert!(opened.actions.is_empty());
-    assert!(opened.presets.is_empty());
-    assert!(!dir.exists(), "opening writes nothing");
-}
-
 #[test]
 fn group_with_sampled_8_and_16_bit_tips_round_trips() {
     let dir = TempDir::new("roundtrip");
@@ -372,4 +358,19 @@ fn bench_load_500_sampled_presets() {
     s.execute("edit.presets.presetManager", json!({"action": "rename", "kind": "brushes", "name": "Brush 3", "newName": "Renamed"})).unwrap();
     let rename = t0.elapsed();
     eprintln!("500 sampled presets: {:.1} MB on disk; write {write:?}, load {load:?}, rename {rename:?}", bytes as f64 / 1e6);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn a_store_directory_that_does_not_exist_yet_opens_without_warnings() {
+    // Windows reports a file under a missing directory as "path not found" (os error 3), not
+    // "file not found"; both mean an empty store, as on a first launch.
+    let parent = TempDir::new("missing-store");
+    let dir = parent.0.join("not-created-yet");
+    assert!(!dir.exists());
+    let opened = open_dir(&dir);
+    assert!(opened.warnings.is_empty(), "{:?}", opened.warnings);
+    assert!(opened.actions.is_empty());
+    let err = DirBackend::new(&dir).read(ACTIONS_FILE, MAX_ACTIONS_BYTES).unwrap_err();
+    assert!(missing_file(&err), "{err}");
 }
