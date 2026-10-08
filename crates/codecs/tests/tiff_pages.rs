@@ -5,8 +5,8 @@
 //! Every file here is hand-built by `common::tiffgen`.
 
 mod common;
-use common::tiffgen::*;
 use common::Rng;
+use common::tiffgen::*;
 use photocraft_codecs::*;
 
 const ORDERS: [(bool, bool); 4] = [(true, false), (false, false), (true, true), (false, true)];
@@ -80,7 +80,11 @@ fn tiles_with_padding_in_both_planar_configurations() {
             for (bits, format, file, want, _) in depths(&t, little) {
                 let bps = bits as usize / 8;
                 for planar in [false, true] {
-                    let mut d = Dir { entries: base(w as u32, h as u32, bits, spp as u16, if spp == 1 { 1 } else { 2 }), chunks: tile_split(&file, w, h, spp, bps, 16, 16, planar), tiled: true };
+                    let mut d = Dir {
+                        entries: base(w as u32, h as u32, bits, spp as u16, if spp == 1 { 1 } else { 2 }),
+                        chunks: tile_split(&file, w, h, spp, bps, 16, 16, planar),
+                        tiled: true,
+                    };
                     d = d.tag(322, SHORT, &[16]).tag(323, SHORT, &[16]).tag(339, SHORT, &[u64::from(format)]);
                     if planar {
                         d = d.tag(284, SHORT, &[2]);
@@ -107,7 +111,11 @@ fn planar_strips_at_every_depth() {
         for (little, big) in ORDERS {
             for (bits, format, file, want, _) in depths(&t, little) {
                 for rows in [1usize, 4, 9] {
-                    let mut d = Dir { entries: base(w as u32, h as u32, bits, spp as u16, 2), chunks: planar_strips(&file, w, h, spp, bits as usize / 8, rows), tiled: false };
+                    let mut d = Dir {
+                        entries: base(w as u32, h as u32, bits, spp as u16, 2),
+                        chunks: planar_strips(&file, w, h, spp, bits as usize / 8, rows),
+                        tiled: false,
+                    };
                     d = d.tag(278, LONG, &[rows as u64]).tag(284, SHORT, &[2]).tag(339, SHORT, &[u64::from(format)]);
                     if spp == 4 {
                         d = d.tag(338, SHORT, &[2]);
@@ -288,19 +296,22 @@ fn every_ifd_and_subifd_is_listed_and_decodable() {
     for (little, big) in ORDERS {
         let sub_ty = if big { IFD8 } else { IFD };
         let dirs = vec![
-            gray_page(4, 3, 1, Some(1)),                              // 0: thumbnail first
-            gray_page(9, 7, 2, None).sub_ifds(sub_ty, &[4, 5]),       // 1: page A, two SubIFDs
-            gray_page(9, 7, 3, Some(4)),                              // 2: its transparency mask
-            gray_page(5, 5, 4, Some(2)),                              // 3: page B (multi-page bit)
-            gray_page(3, 2, 5, Some(1)),                              // 4: SubIFD: reduced copy of A
-            gray_page(2, 1, 6, Some(1)),                              // 5: SubIFD: smaller copy
+            gray_page(4, 3, 1, Some(1)),                        // 0: thumbnail first
+            gray_page(9, 7, 2, None).sub_ifds(sub_ty, &[4, 5]), // 1: page A, two SubIFDs
+            gray_page(9, 7, 3, Some(4)),                        // 2: its transparency mask
+            gray_page(5, 5, 4, Some(2)),                        // 3: page B (multi-page bit)
+            gray_page(3, 2, 5, Some(1)),                        // 4: SubIFD: reduced copy of A
+            gray_page(2, 1, 6, Some(1)),                        // 5: SubIFD: smaller copy
         ];
         let b = build(little, big, &dirs, &[0, 1, 2, 3]);
         let info = tiff_info(&b.bytes).unwrap();
         assert!(info.complete);
         let summary: Vec<(u32, Option<usize>, TiffPageKind)> = info.pages.iter().map(|p| (p.width, p.parent, p.kind)).collect();
         use TiffPageKind::*;
-        assert_eq!(summary, [(4, None, ReducedResolution), (9, None, Page), (3, Some(1), ReducedResolution), (2, Some(1), ReducedResolution), (9, None, Mask), (5, None, Page)]);
+        assert_eq!(
+            summary,
+            [(4, None, ReducedResolution), (9, None, Page), (3, Some(1), ReducedResolution), (2, Some(1), ReducedResolution), (9, None, Mask), (5, None, Page)]
+        );
         assert_eq!(info.pages[1].ifd_offset, b.ifd_at[1]);
         assert_eq!((info.default_page(), info.page_count()), (Some(1), 2));
         // Like Photoshop: the first full-resolution page opens; the thumbnail is skipped.
@@ -449,7 +460,12 @@ fn hostile_sizes_and_counts_are_refused_without_allocating() {
 #[test]
 fn banded_decode_matches_the_encoder_on_larger_images() {
     // Many strips decoded in parallel bands, at every depth and compression.
-    for (layout, sample) in [(ChannelLayout::Rgb, SampleType::U8), (ChannelLayout::Rgba, SampleType::U16), (ChannelLayout::Gray, SampleType::F32), (ChannelLayout::Cmyk, SampleType::U8)] {
+    for (layout, sample) in [
+        (ChannelLayout::Rgb, SampleType::U8),
+        (ChannelLayout::Rgba, SampleType::U16),
+        (ChannelLayout::Gray, SampleType::F32),
+        (ChannelLayout::Cmyk, SampleType::U8),
+    ] {
         let img = common::synth(613, 411, layout, sample, 3, 0.2);
         for c in [TiffCompression::None, TiffCompression::Lzw, TiffCompression::Deflate, TiffCompression::PackBits] {
             let bytes = encode(&img, Format::Tiff, &EncodeOptions { tiff_compression: c, ..Default::default() }).unwrap();
@@ -459,7 +475,9 @@ fn banded_decode_matches_the_encoder_on_larger_images() {
     }
     // Tiles across many bands.
     let t = truth(300 * 260 * 3, 77);
-    let d = Dir { entries: base(300, 260, 16, 3, 2), chunks: tile_split(&u16s(&t.u16s, false), 300, 260, 3, 2, 64, 32, false), tiled: true }.tag(322, SHORT, &[64]).tag(323, SHORT, &[32]);
+    let d = Dir { entries: base(300, 260, 16, 3, 2), chunks: tile_split(&u16s(&t.u16s, false), 300, 260, 3, 2, 64, 32, false), tiled: true }
+        .tag(322, SHORT, &[64])
+        .tag(323, SHORT, &[32]);
     assert_eq!(decode_ok(&build(false, true, &[d], &[0]).bytes).data(), &ne16(&t.u16s)[..]);
 }
 
@@ -488,8 +506,14 @@ fn zoo() -> Vec<Vec<u8>> {
     let t = truth(6 * 5 * 4, 5);
     for (little, big) in ORDERS {
         let sub_ty = if big { IFD8 } else { IFD };
-        let tiles = Dir { entries: base(6, 5, 8, 3, 2), chunks: tile_split(&t.u8s, 6, 5, 3, 1, 16, 16, true), tiled: true }.tag(322, SHORT, &[16]).tag(323, SHORT, &[16]).tag(284, SHORT, &[2]);
-        let planar = Dir { entries: base(6, 5, 16, 4, 2), chunks: planar_strips(&u16s(&t.u16s, little), 6, 5, 4, 2, 2), tiled: false }.tag(278, SHORT, &[2]).tag(284, SHORT, &[2]).tag(338, SHORT, &[1]);
+        let tiles = Dir { entries: base(6, 5, 8, 3, 2), chunks: tile_split(&t.u8s, 6, 5, 3, 1, 16, 16, true), tiled: true }
+            .tag(322, SHORT, &[16])
+            .tag(323, SHORT, &[16])
+            .tag(284, SHORT, &[2]);
+        let planar = Dir { entries: base(6, 5, 16, 4, 2), chunks: planar_strips(&u16s(&t.u16s, little), 6, 5, 4, 2, 2), tiled: false }
+            .tag(278, SHORT, &[2])
+            .tag(284, SHORT, &[2])
+            .tag(338, SHORT, &[1]);
         let dirs = vec![gray_page(3, 2, 1, Some(1)), tiles.sub_ifds(sub_ty, &[3]), planar, gray_page(2, 2, 4, Some(1)).tag(274, SHORT, &[6])];
         v.push(build(little, big, &dirs, &[0, 1, 2]).bytes);
         v.push(build(little, big, &[strips(5, 3, 1, 1, 0, 2, &[0xa5; 3])], &[0]).bytes);

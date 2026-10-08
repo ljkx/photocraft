@@ -51,9 +51,9 @@ pub(crate) const STRUCTURAL_TAGS: &[u16] = &[256, 257, 258, 259, 262, 273, 277, 
 /// Bytes per value of a TIFF field type; `None` for unknown types (whose entries are skipped).
 fn type_size(ty: u16) -> Option<u64> {
     Some(match ty {
-        1 | 2 | 6 | 7 => 1,           // BYTE, ASCII, SBYTE, UNDEFINED
-        3 | 8 => 2,                   // SHORT, SSHORT
-        4 | 9 | 11 | 13 => 4,         // LONG, SLONG, FLOAT, IFD
+        1 | 2 | 6 | 7 => 1,              // BYTE, ASCII, SBYTE, UNDEFINED
+        3 | 8 => 2,                      // SHORT, SSHORT
+        4 | 9 | 11 | 13 => 4,            // LONG, SLONG, FLOAT, IFD
         5 | 10 | 12 | 16 | 17 | 18 => 8, // RATIONAL, SRATIONAL, DOUBLE, LONG8, SLONG8, IFD8
         _ => return None,
     })
@@ -151,11 +151,8 @@ impl<'a> File<'a> {
         if at < self.header_len() {
             return None;
         }
-        let (n, first, entry, inline) = if self.big {
-            (self.u64_at(at)?, at.checked_add(8)?, 20u64, 8u64)
-        } else {
-            (u64::from(self.u16_at(at)?), at.checked_add(2)?, 12, 4)
-        };
+        let (n, first, entry, inline) =
+            if self.big { (self.u64_at(at)?, at.checked_add(8)?, 20u64, 8u64) } else { (u64::from(self.u16_at(at)?), at.checked_add(2)?, 12, 4) };
         if n > MAX_ENTRIES {
             return None;
         }

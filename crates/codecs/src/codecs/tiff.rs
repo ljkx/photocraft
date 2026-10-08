@@ -242,7 +242,10 @@ pub(crate) fn decode_page(bytes: &[u8], page: Option<usize>, limits: &Limits) ->
         Some(i) => i,
         None => info.default_page().ok_or_else(|| err("no image directory"))?,
     };
-    let p = info.pages.get(index).ok_or_else(|| CodecError::InvalidImage(format!("TIFF page {index} does not exist (the file has {} directories)", info.pages.len())))?;
+    let p = info
+        .pages
+        .get(index)
+        .ok_or_else(|| CodecError::InvalidImage(format!("TIFF page {index} does not exist (the file has {} directories)", info.pages.len())))?;
     let dir = file.ifd(p.ifd_offset).ok_or_else(|| err("image directory cut off"))?;
     let mut img = decode_ifd(&file, &dir, limits)?;
     img.meta = metadata(&file, &dir, &mut img.icc);
@@ -258,10 +261,7 @@ pub(crate) fn decode_page(bytes: &[u8], page: Option<usize>, limits: &Limits) ->
 pub(crate) fn orientation(bytes: &[u8], page: Option<usize>) -> u16 {
     let Some(file) = File::parse(bytes) else { return 1 };
     let Ok(info) = ifd::info_of(&file) else { return 1 };
-    page.or_else(|| info.default_page())
-        .and_then(|i| info.pages.get(i))
-        .and_then(|p| file.ifd(p.ifd_offset))
-        .map_or(1, |d| ifd::orientation_of(&file, &d))
+    page.or_else(|| info.default_page()).and_then(|i| info.pages.get(i)).and_then(|p| file.ifd(p.ifd_offset)).map_or(1, |d| ifd::orientation_of(&file, &d))
 }
 
 /// The page's metadata; the ICC profile goes to `icc`.
@@ -293,11 +293,8 @@ fn metadata(f: &File<'_>, dir: &Ifd, icc: &mut Option<Vec<u8>>) -> Metadata {
     }
     // Photoshop keeps a layered TIFF's layers and resources in IFD0, where `photoshop_tags`
     // reads them; any other page reads its own directory's copies.
-    let (resources, layers) = if dir.at == f.first_ifd {
-        photoshop_tags(f.b)
-    } else {
-        (f.tag_bytes(dir, TAG_PHOTOSHOP), f.tag_bytes(dir, TAG_IMAGE_SOURCE_DATA))
-    };
+    let (resources, layers) =
+        if dir.at == f.first_ifd { photoshop_tags(f.b) } else { (f.tag_bytes(dir, TAG_PHOTOSHOP), f.tag_bytes(dir, TAG_IMAGE_SOURCE_DATA)) };
     meta.photoshop_resources = resources.map(<[u8]>::to_vec);
     meta.photoshop_layers = layers.map(<[u8]>::to_vec);
     meta
@@ -563,7 +560,9 @@ fn decode_ifd(f: &File<'_>, dir: &Ifd, limits: &Limits) -> Result<Image, CodecEr
     let (out_layout, chunk_spp) = match ct {
         _ if palette.is_some() => (ChannelLayout::Rgb, 1),
         tiff::ColorType::Gray(_) => (ChannelLayout::Gray, 1),
-        tiff::ColorType::Multiband { num_samples, .. } if photometric <= 1 => (if gray_alpha { ChannelLayout::GrayA } else { ChannelLayout::Gray }, usize::from(num_samples)),
+        tiff::ColorType::Multiband { num_samples, .. } if photometric <= 1 => {
+            (if gray_alpha { ChannelLayout::GrayA } else { ChannelLayout::Gray }, usize::from(num_samples))
+        }
         tiff::ColorType::RGB(_) => (ChannelLayout::Rgb, 3),
         tiff::ColorType::RGBA(_) => (ChannelLayout::Rgba, 4),
         tiff::ColorType::CMYK(_) => (ChannelLayout::Cmyk, 4),
