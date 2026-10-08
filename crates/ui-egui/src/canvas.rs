@@ -329,6 +329,53 @@ fn brush_tip_centre(tool: Tool, option: bool, show_crosshair: bool, radius: f32)
     show_crosshair || radius > 6.0 || tool == Tool::BackgroundEraser
 }
 
+/// The display colour of an RGB triple (0..1 per channel) as an egui colour.
+fn display_color(c: [f32; 3]) -> Color32 {
+    let b = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+    Color32::from_rgb(b(c[0]), b(c[1]), b(c[2]))
+}
+
+/// The Eyedropper ring's two colours at document point (x, y): the colour under the pointer
+/// (what a click would pick) and the current foreground, or `None` where there is no colour
+/// to sample (#213).
+pub(crate) fn eyedropper_ring_colors(app: &mut PhotocraftApp, x: f64, y: f64) -> Option<(Color32, Color32)> {
+    let new = composite_color(app, x, y)?;
+    let fg = app.session.tools.foreground;
+    Some((display_color(new), display_color([fg[0], fg[1], fg[2]])))
+}
+
+/// Draw the Eyedropper's comparison ring at `p`: the sampled colour on the upper arc, the
+/// current one below, both over a thin dark outline so they read on any image (#213). Like
+/// Photoshop it shows only while the mouse button is held (`held`): hovering shows the plain
+/// crosshair and samples nothing. `None` when not held, there is nothing to sample, or the
+/// Precise-cursor preference wants the plain crosshair.
+fn eyedropper_ring(app: &mut PhotocraftApp, painter: &egui::Painter, xf: &ViewXform, p: Pos2, held: bool) -> Option<egui::CursorIcon> {
+    if !held || app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise {
+        return None;
+    }
+    let [x, y] = xf.to_doc(p);
+    let (new, current) = eyedropper_ring_colors(app, x, y)?;
+    // Two arcs with a small gap at 3 and 9 o'clock. Screen y grows down, so PI..TAU is the
+    // upper half (the new colour) and 0..PI the lower (the current one).
+    use std::f32::consts::{PI, TAU};
+    let (r, w, gap) = (11.0_f32, 4.0_f32, 0.16_f32);
+    let arc = |a0: f32, a1: f32| -> Vec<Pos2> {
+        (0..=24)
+            .map(|i| {
+                let a = a0 + (a1 - a0) * i as f32 / 24.0;
+                p + vec2(a.cos(), a.sin()) * r
+            })
+            .collect()
+    };
+    let outline = crate::theme::Tokens::get(painter.ctx()).shadow;
+    for (a0, a1, colour) in [(PI + gap, TAU - gap, new), (gap, PI - gap, current)] {
+        let points = arc(a0, a1);
+        painter.add(egui::Shape::line(points.clone(), Stroke::new(w + 1.5, outline)));
+        painter.add(egui::Shape::line(points, Stroke::new(w, colour)));
+    }
+    Some(egui::CursorIcon::None)
+}
+
 fn begin_live_stroke(app: &PhotocraftApp) -> Option<LiveStroke> {
     static STROKES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let st = app.session.active()?;
@@ -559,6 +606,9 @@ pub(crate) const GPU_OUTPUT: u32 = u32::MAX;
 
 /// The document to render: the committed one, or a clone with the live adjustment preview applied.
 fn display_doc(app: &mut PhotocraftApp, idx: usize) -> (std::sync::Arc<Document>, u64) {
+    if let Some(shown) = crate::type_transform::display_doc(app, idx) {
+        return shown;
+    }
     // Puppet / Perspective Warp previews hide the layer they draw on a mesh.
     if let Some(shown) = crate::distort_ui::display_doc(app, idx) {
         return shown;
@@ -704,7 +754,7 @@ pub fn ensure_texture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, 
     // a large document (taken by the GPU path) would cost a full-size CPU composite per change.
     if crate::adjust_preview::shown_key(app) == Some(preview_key)
         && let Some(st) = app.session.documents().get(idx)
-        && crate::proxy::factor(&st.doc) > 1
+        && crate::proxy::preview_factor(&st.doc, crate::proxy::reduced_previews(app)) > 1
     {
         (doc, preview_key) = (st.doc.clone(), 0);
     }
@@ -762,6 +812,12 @@ pub fn ensure_texture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, 
 fn damage_since(app: &PhotocraftApp, idx: usize, seen: (u64, u64), now: (u64, u64), display_key: u64, last_damage: Option<DRect>) -> Option<DRect> {
     if seen.1 == now.1 ^ display_key && seen.0 + 1 == now.0 {
         return last_damage;
+    }
+    if seen.0 == now.0
+        && let Some(st) = app.session.documents().get(idx)
+        && let Some(r) = crate::type_transform::damage(app, st.doc.id, now.0, seen.1 ^ display_key, now.1)
+    {
+        return Some(if r.is_empty() { r } else { r.inflate(effect_reach(&st.doc.layers)) });
     }
     // Between an adjustment dialog's previews (and the document): the target's area.
     if seen.0 == now.0
@@ -940,7 +996,7 @@ fn ensure_filter_preview(app: &mut PhotocraftApp, idx: usize) -> Option<(u32, u6
         let st = app.session.documents().get(idx)?;
         (st.doc.id, st.revision, st.doc.clone(), st.active_layer)
     };
-    let k = crate::proxy::factor(&doc);
+    let k = crate::proxy::preview_factor(&doc, crate::proxy::reduced_previews(app));
     let hash = format!("{cmd}{params}").bytes().fold(k as u64 ^ revision.wrapping_mul(0x9e37), |h, b| h.wrapping_mul(31).wrapping_add(b as u64));
     let key = doc_id.0 ^ (1u64 << 61);
     let fresh = matches!(&app.filter_preview, Some(p) if p.doc == doc_id && p.hash == hash);
@@ -992,7 +1048,8 @@ fn ensure_proxy_preview(app: &mut PhotocraftApp, idx: usize) -> Option<(u32, u64
         let st = app.session.documents().get(idx)?;
         (st.doc.id, st.revision, st.doc.clone())
     };
-    let k = crate::proxy::factor(&doc);
+    // Low-resolution previews off: k is 1 and the canvas shows `display_doc` (full size).
+    let k = crate::proxy::preview_factor(&doc, crate::proxy::reduced_previews(app));
     if k <= 1 {
         return None;
     }
@@ -1755,7 +1812,8 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     let drop_shadow = border == photocraft_engine::prefs::CanvasBorder::DropShadow;
     // Drop shadow, checkerboard, document image.
     let img_rect = xf.doc_rect(doc.bounds());
-    // Live adjustment previews on big documents use a downsampled proxy (see proxy.rs).
+    // Live adjustment previews on big documents use a downsampled proxy (see proxy.rs), unless
+    // Preferences › Performance › Low Resolution Previews is off.
     let mut on_gpu = false;
     // A flipped view draws through the CPU path (the GPU canvas shader has no mirroring).
     if app.gpu.is_some()
@@ -1960,7 +2018,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         d.reposition = reposition;
         drawing = true;
     }
-    let temporary = crate::hold_keys::for_frame(app, &ctx, drawing);
+    let temporary = crate::hold_keys::for_frame(app, &ctx, drawing || crate::type_transform::active(app));
     let space_pan = temporary == Some(crate::hold_keys::Temporary::Hand);
     let middle = ui.input(|i| i.pointer.middle_down());
     let tool = match temporary {
@@ -2015,6 +2073,26 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         // (Preferences › Tools, `paint_mouse`).
         crate::paint_mouse::sync_tool_smoothing(app);
         let mut buttons = crate::paint_mouse::canvas_buttons(app, &response, tool);
+        // Capture temporary Type transforms at the actual press, before egui's drag threshold.
+        // Releasing Command before the first recognised move must not turn it into text selection.
+        let type_press = egui::Id::new("type-pointer-press-modifiers");
+        if tool.is_type()
+            && let Some((p, press_mods)) = ui.input(|i| {
+                i.events.iter().find_map(|e| match e {
+                    egui::Event::PointerButton { pos, button: PointerButton::Primary, pressed: true, modifiers } if rect.contains(*pos) => {
+                        Some((*pos, *modifiers))
+                    }
+                    _ => None,
+                })
+            })
+        {
+            let press_mods = crate::workspace_ui::sticky_mods(app, press_mods);
+            ctx.data_mut(|d| d.insert_temp(type_press, press_mods));
+            if press_mods.command && app.ui.text_edit.is_some() {
+                let d = xf.to_doc(p);
+                tool_event(app, ToolEvent::Down { x: d[0], y: d[1], pressure: app.stylus.pressure() }, press_mods);
+            }
+        }
         // Right-click while transforming: switch the box's mode (Free Transform, Scale, Rotate,
         // Skew, Distort, Perspective).
         let transforming = app.ui.transform.as_ref().is_some_and(|t| t.warp.is_none());
@@ -2066,7 +2144,8 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                 begin_transform_controls_at(app, &ctx, &xf, p);
             }
             let d = xf.to_doc(p);
-            tool_event(app, ToolEvent::Down { x: d[0], y: d[1], pressure: app.stylus.pressure() }, mods);
+            let press_mods = if tool.is_type() { ctx.data(|d| d.get_temp(type_press)).unwrap_or(mods) } else { mods };
+            tool_event(app, ToolEvent::Down { x: d[0], y: d[1], pressure: app.stylus.pressure() }, press_mods);
         }
         if buttons.dragged || buttons.stopped {
             // Feed every pointer move the OS delivered this frame, not just the latest position, so
@@ -2162,7 +2241,7 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
         if app.ui.transform.is_some() && response.double_clicked() {
             crate::transform_tool::commit(app);
         }
-        if tool.is_type() && response.double_clicked() {
+        if tool.is_type() && response.double_clicked() && !crate::type_transform::visible(app, crate::workspace_ui::sticky_mods(app, mods)) {
             crate::type_tool::select_word(app);
         }
         if app.ui.extras.grid && app.ui.view.extras {
@@ -2198,6 +2277,11 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
             ui.ctx().set_cursor_icon(if vertical { egui::CursorIcon::ResizeHorizontal } else { egui::CursorIcon::ResizeVertical });
         } else if let Some(c) = response.hover_pos().and_then(|p| crate::transform_tool::cursor(app, xf.to_doc(p), ui.input(|i| i.modifiers.alt))) {
             ui.ctx().set_cursor_icon(c);
+        } else if let Some(c) = response.hover_pos().filter(|_| tool.is_type()).and_then(|p| {
+            let mods = crate::workspace_ui::sticky_mods(app, ui.input(|i| i.modifiers));
+            crate::type_transform::cursor(app, &ctx, &xf, p, mods)
+        }) {
+            ui.ctx().set_cursor_icon(c);
         } else if let Some(c) = response.hover_pos().filter(|_| tool == Tool::Crop).and_then(|p| crate::crop_ui::cursor(app, xf.to_doc(p))) {
             ui.ctx().set_cursor_icon(c);
         } else if app.drag.as_ref().is_some_and(|d| d.sel_move.is_some())
@@ -2216,7 +2300,10 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                 // ⌥ turns a painting tool into the Eyedropper (`alt_eyedropper`): its cursor too,
                 // unless Preferences › Cursors › Other Cursors asks for the precise crosshair.
                 t if app.alt_sampling || (app.drag.is_none() && alt_samples(t, crate::workspace_ui::sticky_mods(app, ui.input(|i| i.modifiers)))) => {
-                    if app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise {
+                    // While it samples (button held), the comparison ring replaces the cursor (#213).
+                    if let Some(icon) = eyedropper_ring(app, &painter, &xf, p, response.is_pointer_button_down_on()) {
+                        icon
+                    } else if app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise {
                         egui::CursorIcon::Crosshair
                     } else {
                         pipette_cursor(ui.ctx(), p)
@@ -2270,10 +2357,19 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                         }
                     }
                 }
+                // The Eyedropper: the comparison ring follows the pointer while it samples (#213);
+                // otherwise its pipette, or the crosshair for Precise Other Cursors.
+                Tool::Eyedropper => {
+                    if let Some(icon) = eyedropper_ring(app, &painter, &xf, p, response.is_pointer_button_down_on()) {
+                        icon
+                    } else if app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise {
+                        egui::CursorIcon::Crosshair
+                    } else {
+                        pipette_cursor(ui.ctx(), p)
+                    }
+                }
                 // Preferences › Cursors › Other Cursors: Precise shows a crosshair for every tool.
-                Tool::Move | Tool::Type | Tool::VerticalType | Tool::Eyedropper
-                    if app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise =>
-                {
+                Tool::Move | Tool::Type | Tool::VerticalType if app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise => {
                     egui::CursorIcon::Crosshair
                 }
                 Tool::Move => egui::CursorIcon::Move,
@@ -2292,7 +2388,6 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
                     }
                 }
                 Tool::Type | Tool::VerticalType => egui::CursorIcon::Text,
-                Tool::Eyedropper => pipette_cursor(ui.ctx(), p),
                 Tool::MagneticLasso => crate::magnetic_lasso_ui::cursor(app, &painter, p, view.zoom),
                 _ => egui::CursorIcon::Crosshair,
             };
@@ -2675,6 +2770,10 @@ pub fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: egui::Modifiers)
     // consume the event, so it never outlives the press it was armed for (#297).
     let armed = std::mem::take(&mut app.brush_resize_armed);
     crate::transform_tool::end_if_left(app);
+    let mods = crate::workspace_ui::sticky_mods(app, mods);
+    if app.ui.transform.is_none() && crate::type_transform::pointer(app, ev, mods) {
+        return;
+    }
     // View › Snap / Snap To and smart guides (snap_ui.rs).
     let raw = ev;
     // A press anywhere but on the floating piece (or with ⇧ / ⌥, to draw) drops it first.
@@ -3453,6 +3552,24 @@ mod tests {
             let r = xf.doc_rect(DRect::new(0, 0, 10, 10));
             assert!(r.width() > 0.0 && r.height() > 0.0);
         }
+    }
+
+    #[test]
+    fn eyedropper_ring_colors_pair_the_sampled_and_current_colours() {
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        app.run("file.new", json!({"width": 40, "height": 20, "background": "transparent"})).unwrap();
+        app.run("shape.create", json!({"kind": "rect", "rect": [0, 0, 20, 20], "fill": "#ff0000"})).unwrap();
+        app.run("tools.setColors", json!({"foreground": [0.0, 0.2, 1.0, 1.0]})).unwrap();
+        let (new, current) = super::eyedropper_ring_colors(&mut app, 10.0, 10.0).expect("over the red square");
+        let near = |c: egui::Color32, r: u8, g: u8, b: u8| {
+            let d = |a: u8, b: u8| i32::from(a).abs_diff(i32::from(b));
+            d(c.r(), r) <= 1 && d(c.g(), g) <= 1 && d(c.b(), b) <= 1
+        };
+        assert!(near(new, 255, 0, 0), "{new:?}");
+        assert!(near(current, 0, 51, 255), "{current:?}");
+        // Transparency and points outside the canvas have nothing to compare.
+        assert!(super::eyedropper_ring_colors(&mut app, 30.0, 10.0).is_none());
+        assert!(super::eyedropper_ring_colors(&mut app, -1.0, 10.0).is_none());
     }
 
     #[test]
