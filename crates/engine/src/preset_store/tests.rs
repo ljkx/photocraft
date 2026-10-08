@@ -107,6 +107,20 @@ fn tip_decoder_rejects_garbage() {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn a_store_directory_that_does_not_exist_yet_is_empty_without_warnings() {
+    // The app's first launch, and every test that opens a store on a fresh path: nothing on disk
+    // is not an error. Windows reports a missing directory differently from a missing file.
+    let dir = std::env::temp_dir().join(format!("pc-presets-{}-missing", std::process::id())).join("nested");
+    let _ = std::fs::remove_dir_all(dir.parent().unwrap_or(&dir));
+    let opened = open_dir(&dir);
+    assert!(opened.warnings.is_empty(), "{:?}", opened.warnings);
+    assert!(opened.actions.is_empty());
+    assert!(opened.presets.is_empty());
+    assert!(!dir.exists(), "opening writes nothing");
+}
+
 #[test]
 fn group_with_sampled_8_and_16_bit_tips_round_trips() {
     let dir = TempDir::new("roundtrip");
