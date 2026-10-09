@@ -2227,6 +2227,10 @@ cameraRaw	Amount	Cantidad
 	Export Swatches for Exchange…	Exportar muestras para intercambio…
 	Reset Swatches	Restablecer muestras
 	Add to Swatches	Añadir a muestras
+# Layer Style > Blending Options (Advanced Blending)
+	Blend If:	Combinar si:
+	Channels:	Canales:
+	Knockout	Cobertura
 	Apply At Canvas Bounds	Aplicar efecto en los límites del lienzo
 
 # Fill dialog, layer style contours and Image Size
@@ -2247,3 +2251,5 @@ cameraRaw	Amount	Cantidad
 	Pupil Size	Tamaño de pupila
 	Darken Amount	Cantidad de oscurecimiento
 	Click a red pupil to neutralize it	Haga clic en una pupila roja para corregirla
+	open source	código abierto
+	…and {n} more	…y {n} más

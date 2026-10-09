@@ -2156,6 +2156,10 @@ cameraRaw	Color	Barvy
 	Export Swatches for Exchange…	Exportovat vzorky pro výměnu…
 	Reset Swatches	Obnovit vzorky
 	Add to Swatches	Přidat do vzorníku
+# Layer Style > Blending Options (Advanced Blending)
+	Blend If:	Prolnout, pokud:
+	Channels:	Kanály:
+	Knockout	Vyřazení
 	Apply At Canvas Bounds	Použít efekt na hranicích plátna
 
 # Fill dialog, layer style contours and Image Size
@@ -2177,3 +2181,5 @@ cameraRaw	Color	Barvy
 	Pupil Size	Velikost zornice
 	Darken Amount	Míra ztmavení
 	Click a red pupil to neutralize it	Klepněte na červenou zornici
+	open source	otevřený zdrojový kód
+	…and {n} more	…a dalších {n}

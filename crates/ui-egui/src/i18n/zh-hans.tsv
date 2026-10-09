@@ -2164,6 +2164,10 @@ cameraRaw	Blending	混合
 	Export Swatches for Exchange…	导出色板以供交换…
 	Reset Swatches	复位色板
 	Add to Swatches	添加到色板
+# Layer Style > Blending Options (Advanced Blending)
+	Blend If:	混合颜色带:
+	Channels:	通道:
+	Knockout	挖空
 	Apply At Canvas Bounds	应用画布边界的效果
 
 # Fill dialog, layer style contours and Image Size
@@ -2185,3 +2189,5 @@ cameraRaw	Blending	混合
 	Pupil Size	瞳孔大小
 	Darken Amount	变暗程度
 	Click a red pupil to neutralize it	单击红色瞳孔以消除反光
+	open source	开源
+	…and {n} more	…以及另外 {n} 项

@@ -2433,6 +2433,10 @@ cameraRaw	Roughness	Неровность
 	Export Swatches for Exchange…	Экспортировать образцы для обмена…
 	Reset Swatches	Восстановить образцы
 	Add to Swatches	Добавить в образцы
+# Layer Style > Blending Options (Advanced Blending)
+	Blend If:	Изображение если:
+	Channels:	Каналы:
+	Knockout	Просвечивание
 	Apply At Canvas Bounds	Применить эффект на границах холста
 
 # Fill dialog, layer style contours and Image Size
@@ -2453,3 +2457,5 @@ cameraRaw	Roughness	Неровность
 	Pupil Size	Размер зрачка
 	Darken Amount	Степень затемнения
 	Click a red pupil to neutralize it	Щёлкните по красному зрачку, чтобы убрать блик
+	open source	открытый исходный код
+	…and {n} more	…и ещё {n}

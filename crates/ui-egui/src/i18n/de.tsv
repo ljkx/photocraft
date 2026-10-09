@@ -2195,6 +2195,10 @@
 	Export Swatches for Exchange…	Farbfelder für Austausch exportieren…
 	Reset Swatches	Farbfelder zurücksetzen
 	Add to Swatches	Zu Farbfeldern hinzufügen
+# Layer Style > Blending Options (Advanced Blending)
+	Blend If:	Farbbereich:
+	Channels:	Kanäle:
+	Knockout	Aussparung
 	Apply At Canvas Bounds	Effekt an Arbeitsflächenbegrenzungen anwenden
 
 # Fill dialog, layer style contours and Image Size
@@ -2215,3 +2219,5 @@
 	Pupil Size	Pupillengröße
 	Darken Amount	Abdunklungsgrad
 	Click a red pupil to neutralize it	Klicken Sie auf eine rote Pupille
+	open source	Open Source
+	…and {n} more	…und {n} weitere

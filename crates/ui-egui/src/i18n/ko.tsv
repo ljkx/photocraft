@@ -2740,6 +2740,10 @@ cameraRaw	Color	색상
 	Export Swatches for Exchange…	교환용 색상 견본 내보내기…
 	Reset Swatches	색상 견본 재설정
 	Add to Swatches	색상 견본에 추가
+# Layer Style > Blending Options (Advanced Blending)
+	Blend If:	혼합 조건:
+	Channels:	채널:
+	Knockout	녹아웃
 	Apply At Canvas Bounds	캔버스 경계에 효과 적용
 	Good	좋음
 	Best	최적
@@ -2762,3 +2766,5 @@ cameraRaw	Color	색상
 	Pupil Size	동공 크기
 	Darken Amount	어둡게 하기 정도
 	Click a red pupil to neutralize it	빨간 동공을 클릭하여 보정합니다
+	open source	오픈 소스
+	…and {n} more	…외 {n}개

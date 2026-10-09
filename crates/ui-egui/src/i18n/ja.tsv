@@ -2139,6 +2139,10 @@ cameraRaw	Color	カラー
 	Export Swatches for Exchange…	交換用にスウォッチを書き出し…
 	Reset Swatches	スウォッチを初期化
 	Add to Swatches	スウォッチに追加
+# Layer Style > Blending Options (Advanced Blending)
+	Blend If:	条件付き合成:
+	Channels:	チャンネル:
+	Knockout	ノックアウト
 	Apply At Canvas Bounds	カンバスの境界に効果を適用
 
 # Fill dialog, layer style contours and Image Size
@@ -2160,3 +2164,5 @@ cameraRaw	Color	カラー
 	Pupil Size	瞳のサイズ
 	Darken Amount	暗くする量
 	Click a red pupil to neutralize it	赤い瞳をクリックして補正します
+	open source	オープンソース
+	…and {n} more	…ほか {n} 件

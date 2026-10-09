@@ -2587,6 +2587,10 @@ cameraRaw	Blending	Fusion
 	Export Swatches for Exchange…	Exporter les nuances pour l'échange…
 	Reset Swatches	Réinitialiser les nuances
 	Add to Swatches	Ajouter au nuancier
+# Layer Style > Blending Options (Advanced Blending)
+	Blend If:	Fusion si :
+	Channels:	Couches :
+	Knockout	Masquage
 	Apply At Canvas Bounds	Appliquer l’effet aux limites de la zone de travail
 
 # Fill dialog, layer style contours and Image Size
@@ -2606,3 +2610,5 @@ cameraRaw	Blending	Fusion
 	Pupil Size	Taille de la pupille
 	Darken Amount	Quantité d'assombrissement
 	Click a red pupil to neutralize it	Cliquez sur une pupille rouge pour la corriger
+	open source	code source ouvert
+	…and {n} more	…et {n} de plus

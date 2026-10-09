@@ -3195,6 +3195,9 @@ cameraRaw	Roughness	Chropowatość
 	Export Swatches for Exchange…	Eksportuj próbki do wymiany…
 	Reset Swatches	Resetuj próbki
 	Add to Swatches	Dodaj do próbek
+	Blend If:	Mieszaj, jeśli:
+	Channels:	Kanały:
+	Knockout	Wycięcie
 	New Brush Preset…	Nowe ustawienie wstępne pędzla…
 	Brush Preset Options	Opcje ustawień wstępnych pędzla
 
@@ -3213,3 +3216,5 @@ cameraRaw	Roughness	Chropowatość
 	Pupil Size	Rozmiar źrenicy
 	Darken Amount	Stopień przyciemnienia
 	Click a red pupil to neutralize it	Kliknij czerwoną źrenicę, aby ją zneutralizować
+	open source	otwarte oprogramowanie
+	…and {n} more	…i {n} więcej

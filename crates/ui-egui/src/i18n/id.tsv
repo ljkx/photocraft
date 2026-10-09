@@ -2574,6 +2574,10 @@ cameraRaw	Blending	Pembauran
 	Export Swatches for Exchange…	Ekspor Swatch untuk Pertukaran…
 	Reset Swatches	Atur Ulang Swatch
 	Add to Swatches	Tambahkan ke Swatch
+# Layer Style > Blending Options (Advanced Blending)
+	Blend If:	Blend If:
+	Channels:	Channel:
+	Knockout	Knockout
 	Apply At Canvas Bounds	Terapkan efek di batas kanvas
 
 # Fill dialog, layer style contours and Image Size
@@ -2593,3 +2597,5 @@ cameraRaw	Blending	Pembauran
 	Pupil Size	Ukuran pupil
 	Darken Amount	Jumlah penggelapan
 	Click a red pupil to neutralize it	Klik pupil merah untuk memperbaikinya
+	open source	sumber terbuka
+	…and {n} more	…dan {n} lagi
