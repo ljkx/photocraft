@@ -129,11 +129,11 @@ pub(crate) fn path_options(ui: &mut egui::Ui, o: &mut crate::state::ToolOptions)
             crate::widgets::dropdown(ui, "path-color", tl!("Color:"), &mut o.path_color, &colors, 120.0);
             ui.end_row();
             ui.label(tl!("Anchor Size:"));
-            let mut size = o.anchor_size as f32;
-            let range = *super::ANCHOR_SIZES.start() as f32..=*super::ANCHOR_SIZES.end() as f32;
-            if crate::widgets::value_field(ui, &mut size, range, "", 58.0).accessible_name(tl!("Anchor Size:")).changed() {
-                o.anchor_size = (size.round() as u32).clamp(*super::ANCHOR_SIZES.start(), *super::ANCHOR_SIZES.end());
-            }
+            // A list of the whole sizes: a value field's arrow and wheel steps are fractions.
+            let sizes: Vec<String> = super::ANCHOR_SIZES.map(|n| n.to_string()).collect();
+            let sizes: Vec<(u32, &str)> = super::ANCHOR_SIZES.zip(sizes.iter().map(String::as_str)).collect();
+            o.anchor_size = o.anchor_size.clamp(*super::ANCHOR_SIZES.start(), *super::ANCHOR_SIZES.end());
+            crate::widgets::dropdown(ui, "path-anchor-size", tl!("Anchor Size:"), &mut o.anchor_size, &sizes, 58.0);
             ui.end_row();
         });
         crate::widgets::checkbox(ui, &mut o.path_mark_start, tl!("Highlight Start Point"));

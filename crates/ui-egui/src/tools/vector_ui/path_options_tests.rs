@@ -65,11 +65,18 @@ fn settings_saved_before_path_options_load_with_the_defaults() {
     assert_eq!(loaded, ToolOptions::default());
 }
 
-/// Rings `draw_start_marks` paints for `path`.
-fn start_rings(path: &Path, look: &PathLook) -> usize {
+/// The centres of the rings `draw_start_marks` paints for `path` (document = screen px here).
+fn start_rings(path: &Path, look: &PathLook) -> Vec<egui::Pos2> {
     let ctx = egui::Context::default();
     let out = ctx.run_ui(egui::RawInput::default(), |ui| draw_start_marks(ui.painter(), path, &|q| pos2(q[0] as f32, q[1] as f32), look));
-    let rings = out.shapes.iter().filter(|s| matches!(s.shape, egui::Shape::Circle(_))).count();
+    let rings = out
+        .shapes
+        .iter()
+        .filter_map(|s| match &s.shape {
+            egui::Shape::Circle(c) => Some(c.center),
+            _ => None,
+        })
+        .collect();
     out.drop_without_applying_deltas();
     rings
 }
@@ -84,8 +91,12 @@ fn highlight_start_point_rings_the_first_anchor_of_open_subpaths_only() {
         Subpath::polyline(&[(70.0, 5.0)]),
     ]);
     let on = PathLook { mark_start: true, ..PathLook::plain(ACCENT) };
-    assert_eq!(start_rings(&path, &on), 2, "the two open subpaths, not the closed one or the lone anchor");
-    assert_eq!(start_rings(&path, &PathLook::plain(ACCENT)), 0, "off by default");
+    assert_eq!(
+        start_rings(&path, &on),
+        [pos2(10.0, 10.0), pos2(5.0, 80.0)],
+        "the first anchors of the two open subpaths, not the closed one or the lone anchor"
+    );
+    assert!(start_rings(&path, &PathLook::plain(ACCENT)).is_empty(), "off by default");
 }
 
 #[test]

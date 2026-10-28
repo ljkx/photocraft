@@ -200,8 +200,9 @@ pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, xf: &ViewXform
             for k in p.subpaths.iter().flat_map(|s| &s.knots) {
                 draw_anchor(painter, to_scr([k.anchor.x, k.anchor.y]), false, &look);
             }
-            draw_start_marks(painter, p, &to_scr, &look);
         }
+        // The start ring shows on an outline without anchor squares too (a shape tool's path).
+        draw_start_marks(painter, p, &to_scr, &look);
     };
     // View › Show › Target Path (under Extras) hides the paths; the Pen's path in progress stays.
     // Free Transform Path draws the path through its box instead (transform_tool).
