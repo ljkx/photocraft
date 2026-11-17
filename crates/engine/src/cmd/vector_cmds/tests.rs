@@ -1559,3 +1559,44 @@ fn headless_diagonal_arrow_preserves_geometry_after_nonuniform_scale() {
 
     assert_eq!(info["path"], transformed["path"]);
 }
+
+/// #15471: a shape whose fill or stroke paint is a document pattern draws that pattern, tiled
+/// from the shape's frame ("Link with Layer"), instead of nothing.
+#[test]
+fn pattern_painted_shapes_draw_the_documents_pattern() {
+    for depth in [8, 16, 32] {
+        let mut s = session(100, 80, depth);
+        // A 2×2 tile: red at its origin, blue elsewhere.
+        let mut tile =
+            photocraft_raster::Surface::new(photocraft_color::PixelFormat::new(photocraft_color::ColorMode::Rgb, photocraft_color::SampleType::U8, true));
+        tile.fill_rect(Rect::new(0, 0, 2, 2), &[0.0, 0.0, 1.0, 1.0]);
+        tile.fill_rect(Rect::new(0, 0, 1, 1), &[1.0, 0.0, 0.0, 1.0]);
+        let pat = photocraft_doc::Pattern::new("dots", tile, 2, 2);
+        s.edit("add pattern", |d, _| {
+            d.patterns.push(pat.clone());
+            Ok(())
+        })
+        .unwrap();
+        let rgba = |sh: &ShapeLayer, x: i32, y: i32| {
+            let c = sh.cache.as_ref().unwrap();
+            photocraft_raster::to_rgba(&c.format(), &c.pixel(x, y))
+        };
+        let close = |a: [f32; 4], b: [f32; 4]| a.iter().zip(&b).all(|(p, q)| (p - q).abs() < 0.01);
+        let (red, blue) = ([1.0, 0.0, 0.0, 1.0], [0.0, 0.0, 1.0, 1.0]);
+
+        // The frame starts on an odd column, so a canvas-anchored tile would put blue at (21, 20).
+        let fill = s.execute("shape.create", json!({"rect": [21, 20, 30, 10], "fill": {"pattern": "dots"}})).unwrap()["layer"].as_u64().unwrap();
+        let sh = shape_layer(doc(&s), LayerId(fill));
+        assert!(close(rgba(&sh, 21, 20), red), "depth {depth}: {:?}", rgba(&sh, 21, 20));
+        assert!(close(rgba(&sh, 22, 20), blue), "depth {depth}: {:?}", rgba(&sh, 22, 20));
+        assert!(close(rgba(&sh, 23, 22), red), "depth {depth}: {:?}", rgba(&sh, 23, 22));
+
+        let stroke =
+            s.execute("shape.create", json!({"rect": [61, 40, 20, 20], "fill": null, "stroke": {"width": 4, "fill": {"pattern": "dots"}}})).unwrap()["layer"]
+                .as_u64()
+                .unwrap();
+        let sh = shape_layer(doc(&s), LayerId(stroke));
+        assert!(close(rgba(&sh, 59, 45), blue), "depth {depth}: {:?}", rgba(&sh, 59, 45));
+        assert!(close(rgba(&sh, 59, 46), red), "depth {depth}: {:?}", rgba(&sh, 59, 46));
+    }
+}

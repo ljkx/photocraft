@@ -87,7 +87,30 @@ fn live_kind(l: &LiveShape) -> &'static str {
 
 /// Re-renders a shape layer's cache for `doc` (canvas-clipped, document pixel format).
 pub fn refresh_shape(doc: &Document, sh: &mut ShapeLayer) {
-    sh.cache = Some(vector::render_shape(sh, doc.pixel_format(), doc.bounds()));
+    let canvas = doc.bounds();
+    let frame = pattern_frame(&sh.path, canvas);
+    let resolve = |f: &Fill| pattern_paint(doc, frame, f);
+    sh.cache = Some(vector::render_shape_with(sh, doc.pixel_format(), canvas, &resolve));
+}
+
+/// The frame a shape's linked pattern is laid out from: its path's bounds on the canvas, as the
+/// compositor lays out a pattern fill layer clipped by the same path as a vector mask
+/// (`photocraft_compose::fill_frame`).
+fn pattern_frame(path: &Path, canvas: photocraft_geom::Rect) -> photocraft_geom::Rect {
+    let Some((x0, y0, x1, y1)) = path.control_bounds().filter(|_| !path.inverted) else { return canvas };
+    let b = photocraft_geom::Rect::new(x0.floor() as i32, y0.floor() as i32, x1.ceil() as i32, y1.ceil() as i32).intersect(&canvas);
+    if b.is_empty() { canvas } else { b }
+}
+
+/// A pattern fill's paint, sampled from the document's pattern table as the compositor samples a
+/// pattern fill layer. `None` for other fills, which the vector crate renders itself; a missing or
+/// unpaintable pattern stays transparent there, as it does on a fill layer.
+fn pattern_paint(doc: &Document, frame: photocraft_geom::Rect, f: &Fill) -> Option<vector::Paint> {
+    let Fill::Pattern { name, scale, id, angle, link, phase } = f else { return None };
+    let pattern = photocraft_doc::pattern::find(&doc.patterns, id, name)?;
+    let tile = photocraft_compose::pattern::Tile::new_in(pattern, doc.pixel_format().mode)?;
+    let place = photocraft_compose::pattern::Placement::new(frame, *link, *phase, *scale, *angle);
+    Some(vector::Paint::Sampled(vector::Sampler(std::sync::Arc::new(move |x, y| tile.sample_area(&place, x, y)))))
 }
 
 /// A staged stroke edit rendered with the same validation and cache refresh as `shape.edit`.

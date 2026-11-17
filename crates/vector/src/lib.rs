@@ -33,6 +33,7 @@ use photocraft_color::{ColorMode, PixelFormat};
 use photocraft_doc::{Fill, FillRule, GradientStyle, Path, PathOp, ShapeLayer, ShapeStroke, StrokeAlign, VectorMask};
 use photocraft_geom::{Rect, TILE_SIZE};
 use photocraft_raster::{Interrupt, Surface};
+use std::sync::Arc;
 
 pub use flatten::{Polyline, flatten_path, flatten_subpath};
 pub use raster::Rasterizer;
@@ -251,6 +252,17 @@ pub fn coverage_surface(r: &Rasterizer, format: PixelFormat, clip: Rect) -> Surf
     s
 }
 
+/// A colour source supplied by the caller: straight RGBA at a pixel centre `(x, y)`. For paints
+/// this crate cannot resolve itself, such as a pattern from the document's pattern table.
+#[derive(Clone)]
+pub struct Sampler(pub Arc<dyn Fn(f64, f64) -> [f32; 4] + Send + Sync>);
+
+impl std::fmt::Debug for Sampler {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Sampler(..)")
+    }
+}
+
 /// Colour source for fills and strokes.
 #[derive(Clone, Debug)]
 pub enum Paint {
@@ -273,6 +285,8 @@ pub enum Paint {
         /// does not align with the layer.
         frame: (f64, f64, f64, f64),
     },
+    /// Sampled by the caller (see [`CompiledShape::with_paints`]).
+    Sampled(Sampler),
 }
 
 impl Paint {
@@ -281,8 +295,9 @@ impl Paint {
     /// gradient field is honoured (midpoints, opacity stops, centre offset, dither, unsorted
     /// stops), rendering the same pixels as the compositor's fill layers; the parity tests in
     /// `photocraft-compose` (which this crate cannot depend on) keep the two in step. Pattern
-    /// fills are not rendered (transparent): they need the document's pattern table, which
-    /// lives above this crate.
+    /// fills are not rendered here (transparent): they need the document's pattern table, which
+    /// lives above this crate; callers that have it resolve them through
+    /// [`CompiledShape::with_paints`].
     pub fn from_fill(f: &Fill, bounds: (f64, f64, f64, f64), canvas: (f64, f64, f64, f64)) -> Paint {
         let rgba = |c: &photocraft_color::Color| {
             let v = c.to_rgb();
@@ -326,6 +341,7 @@ impl Paint {
                 }
                 c
             }
+            Paint::Sampled(s) => (s.0)(x, y),
         }
     }
 }
@@ -588,6 +604,17 @@ impl CompiledShape {
     /// [`CompiledShape::new`] with the feather computed over `coverage` while gradients still lay
     /// out in `gradient_frame`: measuring a shape beyond the canvas it is drawn in.
     pub fn with_frames(shape: &ShapeLayer, tol: f64, coverage: Rect, gradient_frame: Rect) -> Self {
+        Self::compile(shape, tol, coverage, gradient_frame, &|_| None)
+    }
+
+    /// [`CompiledShape::new`] with fill and stroke paints the caller resolves: `resolve` returns
+    /// the paint for a model fill, or `None` to render it as [`Paint::from_fill`] does. For
+    /// pattern fills, which need the document's pattern table.
+    pub fn with_paints(shape: &ShapeLayer, tol: f64, canvas: Rect, resolve: &dyn Fn(&Fill) -> Option<Paint>) -> Self {
+        Self::compile(shape, tol, canvas, canvas, resolve)
+    }
+
+    fn compile(shape: &ShapeLayer, tol: f64, coverage: Rect, gradient_frame: Rect, resolve: &dyn Fn(&Fill) -> Option<Paint>) -> Self {
         let pb = shape.path.control_bounds().unwrap_or((0.0, 0.0, 0.0, 0.0));
         let g = gradient_frame;
         let cb = (f64::from(g.x0), f64::from(g.y0), f64::from(g.x1), f64::from(g.y1));
@@ -596,7 +623,7 @@ impl CompiledShape {
         let fill = shape.fill.as_ref().map(|f| {
             let coverage = FillCoverage::new(shape, &area, coverage);
             bounds = coverage.bounds();
-            (coverage, Paint::from_fill(f, pb, cb))
+            (coverage, resolve(f).unwrap_or_else(|| Paint::from_fill(f, pb, cb)))
         });
         let all_closed = shape.path.subpaths.iter().all(|s| s.closed);
         let mut align = None;
@@ -613,7 +640,7 @@ impl CompiledShape {
                 (Some(a), Some(b)) => Some(a.union(&b)),
                 (a, b) => a.or(b),
             };
-            (r, Paint::from_fill(&s.paint, pb, cb), s.opacity.clamp(0.0, 1.0))
+            (r, resolve(&s.paint).unwrap_or_else(|| Paint::from_fill(&s.paint, pb, cb)), s.opacity.clamp(0.0, 1.0))
         });
         if shape.path.inverted && shape.fill.is_some() {
             bounds = Some(Rect::new(i32::MIN / 4, i32::MIN / 4, i32::MAX / 4, i32::MAX / 4));
@@ -696,6 +723,11 @@ impl CompiledShape {
 /// `clip` — the canvas, which also lays out gradients whose fill is not aligned with the layer.
 pub fn render_shape(shape: &ShapeLayer, format: PixelFormat, clip: Rect) -> Surface {
     CompiledShape::new(shape, DEFAULT_TOLERANCE, clip).render(format, clip)
+}
+
+/// [`render_shape`] with caller-resolved paints (see [`CompiledShape::with_paints`]).
+pub fn render_shape_with(shape: &ShapeLayer, format: PixelFormat, clip: Rect, resolve: &dyn Fn(&Fill) -> Option<Paint>) -> Surface {
+    CompiledShape::with_paints(shape, DEFAULT_TOLERANCE, clip, resolve).render(format, clip)
 }
 
 #[cfg(test)]
