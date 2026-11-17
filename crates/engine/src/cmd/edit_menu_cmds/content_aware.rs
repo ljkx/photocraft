@@ -311,7 +311,7 @@ pub fn content_aware_plan_with(doc: &Document, id: LayerId, p: &Value, cmd: &str
     let pixels = read_window(surf, rect, &cancel).ok_or(EngineError::Cancelled)?;
     let (img, layer_px) = if sample_all {
         stop()?;
-        (crate::retouch_cmds::composite_region(doc, Some(id), crate::retouch_cmds::SampleLayers::All, rect, fmt).data, Some(pixels))
+        (crate::retouch_cmds::composite_for_target(doc, Some(id), rect, fmt).data, Some(pixels))
     } else {
         (pixels, None)
     };

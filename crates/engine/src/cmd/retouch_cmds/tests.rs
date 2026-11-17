@@ -1375,6 +1375,60 @@ fn sample_all_layers_spot_healing_heals_onto_an_empty_layer() {
     }
 }
 
+/// #15464: Sample All Layers on an empty layer above a grey picture, with an Invert adjustment
+/// layer above or below the target. An adjustment above the target is left out of the sample (else
+/// the result shows inverted twice); one below the target stays in, as before.
+#[test]
+fn sample_all_layers_leaves_out_adjustment_layers_above_the_target() {
+    use photocraft_doc::{Adjustment, Layer};
+    let grey = |_: i32, _: i32| [0.25, 0.25, 0.25, 1.0];
+    let stroke = |extra: Value| {
+        let mut p = json!({"points": [[10, 15], [40, 15]], "size": 16, "hardness": 100, "strength": 100, "sampleAllLayers": true});
+        p.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        p
+    };
+    // (command, params, selection to make first)
+    let cases = [
+        ("paint.blur", stroke(json!({})), None),
+        ("paint.sharpen", stroke(json!({"protectDetail": false})), None),
+        ("paint.smudge", stroke(json!({"strength": 80})), None),
+        ("paint.spotHealing", json!({"points": [[25, 15]], "size": 12, "hardness": 100, "sampleAllLayers": true}), None),
+        ("paint.remove", json!({"points": [[20, 15], [30, 15]], "size": 10, "sampleAllLayers": true}), None),
+        ("paint.contentAwareMove", json!({"offset": [40, 0], "sampleAllLayers": true}), Some([20, 10, 10, 10])),
+        ("paint.patch", json!({"offset": [40, 0], "contentAware": true, "sampleAllLayers": true}), Some([20, 10, 10, 10])),
+        ("edit.contentAwareFill", json!({"sampleAllLayers": true, "colorAdaptation": "none"}), Some([20, 10, 10, 10])),
+    ];
+    let mut wrong = Vec::new();
+    for (cmd, p, sel) in cases {
+        for invert_above in [true, false] {
+            let mut s = two_layers(grey);
+            s.edit("invert", |doc, active| {
+                let target = active.ok_or_else(|| EngineError::Other("no active layer".into()))?;
+                let invert = Layer::new("invert", LayerContent::Adjustment(Adjustment::Invert));
+                if invert_above {
+                    doc.insert_above(Some(target), invert)
+                } else {
+                    doc.insert_below(Some(target), invert)
+                };
+                Ok(())
+            })
+            .unwrap();
+            if let Some([x, y, width, height]) = sel {
+                s.execute("select.rect", json!({"x": x, "y": y, "width": width, "height": height})).unwrap();
+            }
+            s.execute(cmd, p.clone()).unwrap_or_else(|e| panic!("{cmd}: {e}"));
+            let px = rgba(&s, 25, 15);
+            // Above: the plain grey (the Invert above shows it inverted once). Below: the inverted
+            // grey the target covers.
+            let want = if invert_above { 0.25 } else { 0.75 };
+            if !(px[3] > 0.99 && (px[0] - want).abs() < 0.02) {
+                wrong.push(format!("{cmd}, invert above {invert_above}: {px:?}, want {want}"));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{wrong:#?}");
+}
+
 #[test]
 fn smudge_across_a_transparent_edge_has_no_dark_fringe() {
     for depth in DEPTHS {

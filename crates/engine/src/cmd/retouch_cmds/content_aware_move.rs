@@ -37,8 +37,8 @@ use photocraft_algo::transform::{Homography, Interp};
 
 use super::patch::{coverage, offset, selection_area, target_layer};
 use super::{
-    Document, EngineError, LayerContent, LayerId, Rect, Region, Result, SampleLayers, Session, Surface, Value, alpha_index, bad, clamp_samples,
-    composite_region, damage_json, flag, has_pixel_layer, json, string, targets_pixels,
+    Document, EngineError, LayerContent, LayerId, Rect, Region, Result, Session, Surface, Value, alpha_index, bad, clamp_samples, composite_for_target,
+    damage_json, flag, has_pixel_layer, json, string, targets_pixels,
 };
 
 const CMD: &str = "paint.contentAwareMove";
@@ -320,12 +320,12 @@ fn window_within(r: Rect, canvas: Rect, margin: i32) -> Rect {
 }
 
 /// The pixels a step works on: the targeted surface, or with Sample All Layers the visible
-/// composite (encoded in the target's format).
+/// composite without the adjustment layers above the target (encoded in the target's format).
 pub(super) fn read(doc: &mut Document, t: Target, p: &Value, rect: Rect) -> Result<Region> {
     let (surf, _) = crate::channel_cmds::target_surface(doc, t.id, p)?;
     if t.all_layers {
         let fmt = surf.format();
-        return Ok(composite_region(doc, None, SampleLayers::All, rect, fmt));
+        return Ok(composite_for_target(doc, t.id, rect, fmt));
     }
     Ok(Region::read(surf, rect))
 }

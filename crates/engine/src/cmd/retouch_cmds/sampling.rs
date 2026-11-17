@@ -1,4 +1,4 @@
-use super::{Document, Footprint, LayerId, PixelFormat, Rect, Region, Result, Surface, Value, bad, flag, from_rgba_into, string, targets_pixels};
+use super::{Document, Footprint, LayerContent, LayerId, PixelFormat, Rect, Region, Result, Surface, Value, bad, flag, from_rgba_into, string, targets_pixels};
 
 // ---------------------------------------------------------------------------------------------
 // Sampling sources
@@ -49,6 +49,24 @@ pub(crate) fn composite_region(pre: &Document, id: Option<LayerId>, which: Sampl
     out
 }
 
+/// The visible composite of `rect` in `fmt` for a "Sample All Layers" stroke on layer `target`
+/// (#15464): every visible layer, except adjustment layers composited after (above) the target.
+/// Their effect is applied again when the stroke's result shows through them, so sampling it
+/// would apply the adjustment twice. Adjustment layers below the target stay in, as in Photoshop.
+pub(crate) fn composite_for_target(pre: &Document, target: Option<LayerId>, rect: Rect, fmt: PixelFormat) -> Region {
+    let walk: Vec<(Vec<usize>, LayerId, bool)> = pre.walk().into_iter().map(|(p, _, l)| (p, l.id, matches!(l.content, LayerContent::Adjustment(_)))).collect();
+    let Some(pos) = target.and_then(|id| walk.iter().position(|(_, l, _)| *l == id)) else {
+        return composite_region(pre, None, SampleLayers::All, rect, fmt);
+    };
+    let mut doc = pre.clone();
+    for (path, _, _) in walk.get(pos + 1..).unwrap_or_default().iter().filter(|(_, _, adj)| *adj) {
+        if let Some(l) = doc.layer_at_mut(path) {
+            l.visible = false;
+        }
+    }
+    composite_region(&doc, None, SampleLayers::All, rect, fmt)
+}
+
 /// Pixels to sample at `rect` (document coordinates, already offset to the source position).
 pub(super) fn sample(pre: &Document, id: Option<LayerId>, surf: &Surface, which: SampleLayers, rect: Rect) -> Region {
     match which {
@@ -67,20 +85,22 @@ pub(super) fn sample_all_layers(p: &Value) -> bool {
 /// composite (kept across dabs, so a dab sees the earlier ones), and the result is laid onto the
 /// layer under the dab. An empty layer above the image so picks up the blurred or smudged picture,
 /// and pixels the effect didn't change look as before (they are what was already visible).
+/// Adjustment layers above the target are left out ([`composite_for_target`]).
 pub(super) struct AllLayers<'a> {
     pre: &'a Document,
+    target: Option<LayerId>,
     fmt: PixelFormat,
     visible: Option<Region>,
 }
 
 impl<'a> AllLayers<'a> {
-    pub(super) fn new(pre: &'a Document, fmt: PixelFormat) -> Self {
-        Self { pre, fmt, visible: None }
+    pub(super) fn new(pre: &'a Document, target: Option<LayerId>, fmt: PixelFormat) -> Self {
+        Self { pre, target, fmt, visible: None }
     }
 
     pub(super) fn dab(&mut self, work: &mut Region, fp: &Footprint, effect: impl FnOnce(&mut Region, &Footprint)) {
-        let (pre, fmt) = (self.pre, self.fmt);
-        let visible = self.visible.get_or_insert_with(|| composite_region(pre, None, SampleLayers::All, work.rect, fmt));
+        let (pre, target, fmt) = (self.pre, self.target, self.fmt);
+        let visible = self.visible.get_or_insert_with(|| composite_for_target(pre, target, work.rect, fmt));
         if visible.rect != work.rect || visible.ch != work.ch {
             return effect(work, fp);
         }

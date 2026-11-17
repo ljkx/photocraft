@@ -248,7 +248,7 @@ use dab::dab_cmd;
 use heal::proximity_source_patch;
 use heal::{heal_region, healing_brush, history_brush, history_source, spot_healing};
 use sampling::sample;
-pub(crate) use sampling::{SampleLayers, composite_region};
+pub(crate) use sampling::{SampleLayers, composite_for_target};
 
 /// Retouching command specs.
 pub fn specs() -> Vec<CommandSpec> {

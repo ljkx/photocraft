@@ -17,8 +17,8 @@
 use super::content_aware_move::{Target, replace};
 use super::patch::coverage;
 use super::{
-    Document, EngineError, LayerId, PixelFormat, Rect, Region, Result, SampleLayers, Session, Stroke, Surface, Value, alpha_index, bad, clamp_samples,
-    composite_region, damage_json, flag, json, parse_brush, reject_huge_stroke, targets_pixels,
+    Document, EngineError, LayerId, PixelFormat, Rect, Region, Result, Session, Stroke, Surface, Value, alpha_index, bad, clamp_samples, composite_for_target,
+    damage_json, flag, json, parse_brush, reject_huge_stroke, targets_pixels,
 };
 use photocraft_doc::Layer;
 
@@ -183,7 +183,7 @@ fn run_remove(doc: &mut Document, plan: &Plan, p: &Value, ctx: &crate::jobs::Job
     let (img, fmt) = {
         let (surf, _) = crate::channel_cmds::target_surface(doc, plan.id, p)?;
         let fmt = surf.format();
-        let img = if plan.all_layers { composite_region(doc, None, SampleLayers::All, win, fmt) } else { Region::read(surf, win) };
+        let img = if plan.all_layers { composite_for_target(doc, plan.id, win, fmt) } else { Region::read(surf, win) };
         (img, fmt)
     };
     // A no-op without the fill or a history step, as the other retouch tools on an empty layer.

@@ -399,7 +399,7 @@ pub(super) fn dab_cmd(s: &mut Session, p: &Value, cmd: &str) -> Result<Value> {
         }
         let fmt = surf.format();
         let mut effect = tool.effect(fmt, stroke.brush.spacing);
-        let mut sampler = all.then(|| AllLayers::new(pre, fmt));
+        let mut sampler = all.then(|| AllLayers::new(pre, id, fmt));
         apply_dab_stroke(surf, &stroke, sel, lock, tool.neighborhood().halo(), |work, fp| match &mut sampler {
             Some(all) => all.dab(work, fp, |w, f| effect(w, f)),
             None => effect(work, fp),

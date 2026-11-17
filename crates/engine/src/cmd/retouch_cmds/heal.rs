@@ -1,6 +1,6 @@
 use super::clone::{apply_clone_coverage, blend_param, clamp_samples, clone_mapping, clone_result, clone_sample};
 use super::periodic;
-use super::sampling::{SampleLayers, composite_region, sample_all_layers, sample_layers};
+use super::sampling::{SampleLayers, composite_for_target, composite_region, sample_all_layers, sample_layers};
 use super::{
     BlendMode, CompleteParams, Document, EngineError, LayerId, PixelFormat, Rect, Region, Result, Session, Stroke, Surface, Value, apply_coverage, bad,
     coverage, damage_json, flag, inpaint, json, parse_brush, poisson, reject_huge_stroke, run_stroke, string,
@@ -247,7 +247,17 @@ enum SpotType {
 /// Photoshop 25.4 (measured): a dab changes exactly the brush's footprint, and Content-Aware takes
 /// its texture from around it, as Edit › Fill does from its window
 /// ([`crate::fill_cmds::sampling_window`] of the stroke's bounds), which is what this samples.
-fn spot_heal_surface(surf: &mut Surface, pre: &Document, stroke: &Stroke, kind: SpotType, all: bool, sel: Option<&Surface>, lock: bool) -> Result<Rect> {
+/// `all` is Sample All Layers: `Some(target layer)` heals from the visible composite (without the
+/// adjustment layers above the target, #15464), `None` from the target's own pixels.
+fn spot_heal_surface(
+    surf: &mut Surface,
+    pre: &Document,
+    stroke: &Stroke,
+    kind: SpotType,
+    all: Option<LayerId>,
+    sel: Option<&Surface>,
+    lock: bool,
+) -> Result<Rect> {
     let (bounds, cov) = coverage("paint.spotHealing", stroke)?;
     let size = stroke.brush.size;
     let region_rect = crate::fill_cmds::sampling_window(bounds, pre.bounds());
@@ -257,7 +267,10 @@ fn spot_heal_surface(surf: &mut Surface, pre: &Document, stroke: &Stroke, kind: 
     // Proximity Match looks for its source anywhere in that window.
     let margin = (region_rect.width().max(region_rect.height()) / 2) as i32;
     let fmt = surf.format();
-    let img = if all { composite_region(pre, None, SampleLayers::All, region_rect, fmt) } else { Region::read(surf, region_rect) };
+    let img = match all {
+        Some(target) => composite_for_target(pre, Some(target), region_rect, fmt),
+        None => Region::read(surf, region_rect),
+    };
     let (w, h, ch) = (img.width(), img.height(), img.ch);
     let bw = bounds.width() as usize;
     let mut stroke_cov = vec![0.0f32; w * h];
@@ -306,7 +319,7 @@ pub(super) fn spot_healing(s: &mut Session, p: &Value) -> Result<Value> {
         "proximityMatch" => SpotType::ProximityMatch,
         o => return Err(bad(CMD, format!("unknown type `{o}` (contentAware|createTexture|proximityMatch)"))),
     };
-    let all = sample_all_layers(p);
+    let all = if sample_all_layers(p) { id } else { None };
     let dmg = run_stroke(s, "Spot Healing Brush", id, p, |pre, surf, sel, lock| spot_heal_surface(surf, pre, &stroke, kind, all, sel, lock))?;
     Ok(json!({ "damage": damage_json(dmg) }))
 }
