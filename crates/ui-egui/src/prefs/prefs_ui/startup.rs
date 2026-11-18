@@ -95,6 +95,23 @@ fn repair_invalid(app: &mut PhotocraftApp, reset: &[craft::settings::SectionErro
     }
 }
 
+/// The notice a Plug-ins preference folder that can't be read posts.
+pub(super) const PLUGIN_FOLDER_TITLE: &str = "Additional Plug-ins Folder couldn't be opened";
+
+/// The Additional Plug-ins Folder couldn't be read when preferences were applied, at launch or
+/// after a change (#15498): say so, instead of leaving Filter › Plug-ins empty with no reason. A
+/// newer failure replaces the older notice.
+pub(super) fn plugin_folder(app: &mut PhotocraftApp) {
+    let Some((folder, error)) = app.session.take_plugin_folder_warning() else { return };
+    crate::notices::remove_titled(app, PLUGIN_FOLDER_TITLE);
+    // Notices keep their English source and are translated when drawn.
+    let lines = vec!["No plug-ins were loaded from {folder}. Check the folder in Preferences › Plug-ins.".into(), "{error}".into()];
+    let id = crate::notices::post(app, PLUGIN_FOLDER_TITLE, lines, craft::theme::variant::Tone::Bad, None);
+    if let Some(notice) = app.ui.notices.iter_mut().find(|n| n.id == id) {
+        notice.args.extend([("folder".into(), folder), ("error".into(), error)]);
+    }
+}
+
 /// Discover recovery entries after construction, then decode one at a time without blocking
 /// the window. Only the completed job's apply step touches the session.
 pub(super) fn recovery(app: &mut PhotocraftApp) {

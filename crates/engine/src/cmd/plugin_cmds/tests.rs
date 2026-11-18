@@ -348,6 +348,30 @@ fn preference_folder_is_loaded() {
     assert_eq!(r["loaded"], json!(["test.cmds.folder"]));
     registry::remove("test.cmds.folder");
     std::fs::remove_dir_all(&dir).ok();
+    assert_eq!(s.take_plugin_folder_warning(), None, "a folder that loads gives no warning");
+}
+
+#[test]
+fn missing_preference_folder_is_reported_once() {
+    // #15498: a mistyped Additional Plug-ins Folder loaded nothing and said nothing.
+    let dir = std::env::temp_dir().join(format!("pc-plugin-prefs-missing-{}", std::process::id()));
+    std::fs::remove_dir_all(&dir).ok();
+    let folder = dir.to_str().unwrap();
+    let mut s = Session::new();
+    s.execute("prefs.set", json!({"path": "plugIns.additionalPluginsFolder", "value": folder})).unwrap();
+    assert_eq!(s.take_plugin_folder_warning(), None, "nothing is loaded, or warned of, while the folder is off");
+    s.execute("prefs.set", json!({"path": "plugIns.useAdditionalPluginsFolder", "value": true})).unwrap();
+    let (warned, error) = s.take_plugin_folder_warning().expect("a missing folder is reported");
+    assert_eq!(warned, folder);
+    assert!(!error.is_empty());
+    assert_eq!(s.take_plugin_folder_warning(), None, "reported once");
+    // Another missing folder, then the fixed one before the shell looked: the warning that is no
+    // longer true is taken back.
+    std::fs::create_dir_all(&dir).unwrap();
+    s.execute("prefs.set", json!({"path": "plugIns.additionalPluginsFolder", "value": format!("{folder}-typo")})).unwrap();
+    s.execute("prefs.set", json!({"path": "plugIns.additionalPluginsFolder", "value": folder})).unwrap();
+    assert_eq!(s.take_plugin_folder_warning(), None, "an existing folder gives no warning");
+    std::fs::remove_dir_all(&dir).ok();
 }
 
 #[test]

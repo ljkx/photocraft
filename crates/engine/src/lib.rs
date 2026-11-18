@@ -207,6 +207,8 @@ pub struct Session {
     pub(crate) batch_open_notices: Option<Vec<Value>>,
     /// Frozen RAW workflow settings for one noninteractive Batch input.
     pub(crate) batch_raw_open: Option<prefs::RawDefaults>,
+    /// The Plug-ins preference folder that failed to load, not yet shown (`plugin_cmds`).
+    pub(crate) plugin_folder_warning: Option<(String, String)>,
     /// Admitted document identities in opening order, independent of visual-tab reordering.
     open_document_order: Vec<photocraft_doc::DocId>,
     active: Option<usize>,

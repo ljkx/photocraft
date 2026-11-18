@@ -3,7 +3,7 @@ use std::time::Instant;
 use craft::platform::autosave::{AutosaveDoc, interval_for_minutes};
 
 use super::appearance::{canvas_style, sync_appearance, sync_display_scale, sync_tooltips};
-use super::startup::{load, presets_store, recovery, sync_rulers};
+use super::startup::{load, plugin_folder, presets_store, recovery, sync_rulers};
 use super::{PhotocraftApp, prefs};
 
 /// The notice a failed preferences write posts; a later successful write removes it.
@@ -26,6 +26,7 @@ pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context, now: Instant) {
     sync_appearance(app, ctx);
     crate::theme::set_ui_font_size(ctx, app.session.prefs().interface.ui_font_size);
     presets_store(app);
+    plugin_folder(app);
     sync_tooltips(app, ctx);
     app.sync_recent();
     #[cfg(not(target_arch = "wasm32"))]

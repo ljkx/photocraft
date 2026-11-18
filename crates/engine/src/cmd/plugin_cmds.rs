@@ -202,18 +202,33 @@ fn load_path(_: &str) -> Result<Plugin> {
 static FOLDER: Mutex<Option<(String, Value)>> = Mutex::new(None);
 
 /// Loads the Plug-ins preference folder (`*.wasm`) when it is enabled and has changed since the
-/// last load. Called whenever preferences are applied (startup, `prefs.set`). Native only.
-pub(crate) fn sync_prefs(s: &Session) {
+/// last load. Called whenever preferences are applied (startup, `prefs.set`). Native only. A
+/// folder that can't be read (most often one that doesn't exist) is kept for
+/// [`Session::take_plugin_folder_warning`] (#15498): before, it only showed in `plugin.list`, and
+/// Filter › Plug-ins stayed empty with no word why.
+pub(crate) fn sync_prefs(s: &mut Session) {
     let pi = &s.prefs().plug_ins;
-    let folder = pi.additional_plugins_folder.trim();
+    let folder = pi.additional_plugins_folder.trim().to_string();
     if !pi.use_additional_plugins_folder || folder.is_empty() {
         return;
     }
     let mut last = FOLDER.lock().unwrap_or_else(|e| e.into_inner());
-    if last.as_ref().is_some_and(|(f, _)| f == folder) {
+    if last.as_ref().is_some_and(|(f, _)| *f == folder) {
         return;
     }
-    *last = Some((folder.to_string(), load_folder(folder)));
+    let report = load_folder(&folder);
+    // A folder that loads replaces a warning not shown yet: it is no longer true.
+    s.plugin_folder_warning = report.get("error").and_then(Value::as_str).map(|e| (folder.clone(), e.to_string()));
+    *last = Some((folder, report));
+}
+
+impl Session {
+    /// The Plug-ins preference folder that last failed to load, as `(folder, error)`, once: the
+    /// app shell shows it to the user (at startup or when the preference changes), and the next
+    /// call returns `None` until another folder fails.
+    pub fn take_plugin_folder_warning(&mut self) -> Option<(String, String)> {
+        self.plugin_folder_warning.take()
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]

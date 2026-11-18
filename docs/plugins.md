@@ -23,7 +23,8 @@ preview when they have parameters), next to **Install Plug-in…**.
 **Preference folder.** Edit › Preferences › Plug-ins › *Use Additional Plug-ins Folder* plus
 *Additional Plug-ins Folder*: when both are set, every `*.wasm` in that folder (not recursive) is
 installed at startup and whenever the preference changes (native builds only; the web build installs
-from bytes).
+from bytes). A folder that doesn't exist or can't be read is reported in a notice, and in
+`plugin.list`'s `folder.error`.
 
 Plug-ins are installed **per process**, not per document. A smart filter recorded from a plug-in
 (`{"command": "plugin.run", "params": {"id", "params"}}`) re-runs on re-render while that plug-in is

@@ -557,6 +557,66 @@ fn failed_preference_saves_are_retried() {
     assert!(!crate::notices::shown_titled(&app, SAVE_NOTICE), "the notice goes once preferences are saved");
 }
 
+/// #15498: in 0.23.1 the Additional Plug-ins Folder field took no paste, so a long path was typed by hand. The
+/// Preferences window drawn by the framework (#15449) takes it: a paste (Ctrl+V, which egui-winit sends as
+/// `Event::Paste`), through the shell's clipboard routing, lands in the field and not in Edit › Paste.
+#[test]
+fn a_paste_lands_in_a_preferences_text_row() {
+    use egui_kittest::kittest::Queryable;
+    let (_, files) = app_with_store();
+    let mut h = prefs_harness(&files, "plugIns", vec2(1280.0, 800.0), |_| {});
+    // Two text fields show: the window's settings search at the top and the page's one text row, Additional Plug-ins
+    // Folder, below it (each field may report nested text-input nodes over the same rect). The row is the lowest.
+    fn folder_row(h: &egui_kittest::Harness<'static, PhotocraftApp>) -> (egui::Pos2, Vec<Option<String>>) {
+        let fields: Vec<_> = h.query_all_by_role(egui::accesskit::Role::TextInput).collect();
+        let mut tops: Vec<f32> = fields.iter().map(|n| n.rect().min.y.round()).collect();
+        tops.sort_by(f32::total_cmp);
+        tops.dedup();
+        assert_eq!(tops.len(), 2, "the search field and the folder row: {tops:?}");
+        let bottom = tops[1];
+        let row: Vec<_> = fields.iter().filter(|n| n.rect().min.y.round() == bottom).collect();
+        (row[0].rect().center(), row.iter().map(|n| n.value()).collect())
+    }
+    let (at, _) = folder_row(&h);
+    h.event(egui::Event::PointerMoved(at));
+    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
+    h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: false, modifiers: egui::Modifiers::NONE });
+    h.run_steps(2);
+    h.event(egui::Event::Paste("C:\\Plugins".into()));
+    h.run_steps(2);
+    let (_, values) = folder_row(&h);
+    assert!(values.iter().any(|v| v.as_deref() == Some("C:\\Plugins")), "the paste lands in the field: {values:?}");
+}
+
+/// #15498: an Additional Plug-ins Folder that doesn't exist loaded nothing and said nothing, at
+/// launch or after the preference changed.
+#[test]
+#[cfg(not(target_arch = "wasm32"))]
+fn missing_additional_plugins_folder_is_reported() {
+    use super::startup::PLUGIN_FOLDER_TITLE;
+    let missing = std::env::temp_dir().join(format!("photocraft-no-plugins-{}", std::process::id()));
+    std::fs::remove_dir_all(&missing).ok();
+    let missing = missing.to_str().unwrap().to_owned();
+    let ctx = egui::Context::default();
+    // At launch, from the saved preferences.
+    let (mut app, _) = app_with_json(&json!({"plugIns": {"useAdditionalPluginsFolder": true, "additionalPluginsFolder": missing}}));
+    tick(&mut app, &ctx);
+    assert!(crate::notices::shown_titled(&app, PLUGIN_FOLDER_TITLE), "a missing folder is reported at launch");
+    let notice = app.ui.notices.iter().find(|n| n.title == PLUGIN_FOLDER_TITLE).unwrap();
+    assert!(notice.text(&notice.lines[0]).contains(&missing), "{:?}", notice.lines);
+    assert_eq!(app.ui.notices.iter().filter(|n| n.title == PLUGIN_FOLDER_TITLE).count(), 1);
+    tick(&mut app, &ctx);
+    assert_eq!(app.ui.notices.iter().filter(|n| n.title == PLUGIN_FOLDER_TITLE).count(), 1, "reported once");
+    // When the preference changes to another folder that doesn't exist.
+    let (mut app, _) = app_with_store();
+    tick(&mut app, &ctx);
+    assert!(!crate::notices::shown_titled(&app, PLUGIN_FOLDER_TITLE), "no folder, no notice");
+    let typo = format!("{missing}-typo");
+    app.run("prefs.set", json!({"values": {"plugIns.useAdditionalPluginsFolder": true, "plugIns.additionalPluginsFolder": typo}})).unwrap();
+    tick(&mut app, &ctx);
+    assert!(crate::notices::shown_titled(&app, PLUGIN_FOLDER_TITLE), "a missing folder is reported when it is set");
+}
+
 #[test]
 fn preferences_persist_through_services_and_theme_follows() {
     let (mut app, store) = app_with_store();
