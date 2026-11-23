@@ -158,6 +158,10 @@ fn sample(kind: &str) -> Value {
 /// `colorize` off, so it stays gray.
 const GRAY_COLOUR: [&str; 7] = ["vibrance", "colorBalance", "blackWhite", "photoFilter", "channelMixer", "gradientMap", "selectiveColor"];
 
+/// Kinds whose command refuses a grayscale document (Hue/Saturation, #14749): no command result
+/// to compare the preview with.
+const GRAY_REFUSED: [&str; 1] = ["hueSaturation"];
+
 fn pm(p: &[f32; 4]) -> [f32; 4] {
     [p[0] * p[3], p[1] * p[3], p[2] * p[3], p[3]]
 }
@@ -187,6 +191,9 @@ fn preview_layer_composites_on_the_gpu_like_the_command() {
                 let (doc, target) = document(mode, depth, selection);
                 for kind in photocraft_ui_egui::adjust_editors::KINDS {
                     let params = sample(kind);
+                    if mode == ColorMode::Grayscale && GRAY_REFUSED.contains(&kind) {
+                        continue;
+                    }
                     let preview = match preview_document(&doc, target, kind, &params) {
                         Ok(p) => p,
                         Err(e) => {
@@ -243,6 +250,9 @@ fn clipped_target_preview_composites_on_the_gpu_like_the_command() {
             let (depth, selection) = PAIRS[(i + offset) % PAIRS.len()];
             let (doc, target) = clipped_document(mode, depth, selection);
             let params = sample(kind);
+            if mode == ColorMode::Grayscale && GRAY_REFUSED.contains(&kind) {
+                continue;
+            }
             let preview = match preview_document(&doc, target, kind, &params) {
                 Ok(p) => p,
                 Err(e) => {

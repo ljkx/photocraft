@@ -165,6 +165,10 @@ pub(crate) fn max_diff(a: &Document, b: &Document) -> f32 {
 /// Kinds that make colour from gray: grayscale documents preview them on the CPU proxy.
 const GRAY_COLOUR: [&str; 7] = ["vibrance", "colorBalance", "blackWhite", "photoFilter", "channelMixer", "gradientMap", "selectiveColor"];
 
+/// Kinds whose command refuses a grayscale document (Hue/Saturation, #14749), so there is no
+/// destructive result to compare a preview with.
+const GRAY_REFUSED: [&str; 1] = ["hueSaturation"];
+
 #[test]
 fn preview_composite_matches_the_destructive_command() {
     let tol = 1.0 / 255.0 + 1e-4;
@@ -178,6 +182,10 @@ fn preview_composite_matches_the_destructive_command() {
                     for params in [sample(kind), json!({})] {
                         let what = format!("{kind} {mode:?} {depth:?} selection {selection} {params}");
                         let want = destructive(&doc, target, kind, &params);
+                        if mode == ColorMode::Grayscale && GRAY_REFUSED.contains(&kind) {
+                            assert!(want.is_none(), "{what}: the command should refuse a grayscale document");
+                            continue;
+                        }
                         let got = preview_document(&doc, target, kind, &params);
                         let gray_colour = mode == ColorMode::Grayscale && GRAY_COLOUR.contains(&kind);
                         let (Some(want), Ok(got)) = (want, got) else {
@@ -217,6 +225,10 @@ fn a_clipped_target_previews_like_the_destructive_command() {
                     for params in [sample(kind), json!({})] {
                         let what = format!("{kind} {mode:?} {depth:?} selection {selection} {params}");
                         let want = destructive(&doc, target, kind, &params);
+                        if mode == ColorMode::Grayscale && GRAY_REFUSED.contains(&kind) {
+                            assert!(want.is_none(), "{what}: the command should refuse a grayscale document");
+                            continue;
+                        }
                         let got = preview_document(&doc, target, kind, &params);
                         let gray_colour = mode == ColorMode::Grayscale && GRAY_COLOUR.contains(&kind);
                         let (Some(want), Ok(got)) = (want, got) else {
