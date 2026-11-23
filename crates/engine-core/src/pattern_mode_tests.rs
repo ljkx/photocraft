@@ -127,7 +127,7 @@ fn wrong_greys(s: &mut Session, what: &str) -> Vec<String> {
 fn edit_fill_and_the_paint_bucket_paint_a_pattern_through_the_grey_profile() {
     let mut wrong = Vec::new();
     for depth in [8, 16] {
-        let mut s = Session::new();
+        let mut s = crate::session();
         let pat = quadrant_pattern(&mut s);
         // Edit › Fill with the pattern on a new layer.
         s.execute("file.new", json!({"width": 40, "height": 40, "mode": "gray", "depth": depth, "background": "white"})).unwrap();
@@ -150,7 +150,7 @@ fn edit_fill_and_the_paint_bucket_paint_a_pattern_through_the_grey_profile() {
 fn edit_fill_with_a_pattern_keeps_its_colours_outside_grayscale() {
     // RGB keeps the pattern's colours exactly; CMYK and Lab keep today's conversion (checked
     // against a pattern fill layer by `pattern_fills_paint_like_edit_fill_in_every_mode`).
-    let mut s = Session::new();
+    let mut s = crate::session();
     let pat = quadrant_pattern(&mut s);
     s.execute("file.new", json!({"width": 40, "height": 40, "mode": "rgb", "depth": 8, "background": "white"})).unwrap();
     s.execute("layer.new.layer", json!({})).unwrap();

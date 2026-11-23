@@ -349,7 +349,7 @@ fn cached_gradient_fill() -> Session {
         let (fmt, canvas) = (doc.pixel_format(), doc.bounds());
         let l = doc.layer_mut(active.unwrap()).unwrap();
         let LayerContent::Fill(f) = &l.content else { panic!("a fill layer") };
-        let buf = photocraft_compose::render_fill_content(l, f, canvas, &[]);
+        let buf = photocraft_compose::render_fill_content(l, f, canvas, &[], fmt.mode);
         let mut surface = Surface::new(fmt);
         let vals: Vec<f32> = buf.px.iter().flat_map(|p| photocraft_raster::from_rgba(&fmt, *p)).collect();
         surface.write_region(canvas, &vals);

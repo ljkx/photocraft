@@ -187,9 +187,11 @@ pub fn fill_frame(layer: &Layer, canvas: Rect) -> Rect {
 }
 
 /// A fill layer's content over `canvas`, laid out in the frame its masks give it (as the
-/// compositor does) but without applying the masks: the pixels a PSD fill layer stores.
-pub fn render_fill_content(layer: &Layer, f: &Fill, canvas: Rect, patterns: &[Pattern]) -> Buffer {
-    let prepared = pattern::PreparedPatterns::new(patterns, pattern::PREPARED_PATTERN_BYTES);
+/// compositor does) but without applying the masks: the pixels a PSD fill layer stores. A pattern
+/// paints as in a document of colour mode `mode`, as the compositor paints it (in Grayscale,
+/// through the grey profile, #14975).
+pub fn render_fill_content(layer: &Layer, f: &Fill, canvas: Rect, patterns: &[Pattern], mode: photocraft_color::ColorMode) -> Buffer {
+    let prepared = pattern::PreparedPatterns::new(patterns, pattern::PREPARED_PATTERN_BYTES).in_mode(mode);
     render_fill(f, canvas, fill_frame(layer, canvas), &prepared, None)
 }
 
