@@ -288,6 +288,8 @@ path.deleteAnchor
 path.deleteSegment
 path.mergeShapeComponents
 path.setOperation
+path.alignComponents
+path.distributeComponents
 select.quick
 select.object
 select.subject
